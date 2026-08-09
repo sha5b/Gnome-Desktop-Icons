@@ -18,13 +18,15 @@ import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 
+import {_} from './gettext.js';
 import {DesktopIcon} from './desktopIcon.js';
-import {actionAvailability, buildItemMenu, defaultApplicationId} from './itemMenu.js';
+import {actionAvailability, buildItemMenu} from './itemMenu.js';
 import {addDragSource, addDropTarget} from './dragAndDrop.js';
 import {clearPosition, writePosition} from './iconPositions.js';
 import {ClickPolicy} from './clickPolicy.js';
+import {OpenWithDialog} from './openWithDialog.js';
 import {RenamePopover} from './renamePopover.js';
-import {openTerminal} from './terminal.js';
+import {openTerminal, runInTerminal} from './terminal.js';
 import {pasteFromClipboard, setClipboard} from './clipboard.js';
 
 const CELL_PADDING = 12;
@@ -307,6 +309,7 @@ class IconView extends Gtk.Fixed {
         this.add_controller(keys);
 
         this._addDragSource();
+        this._addRubberBand();
 
         addDropTarget(this, {
             onFiles: (files, x, y, action) => this._onFilesDropped(files, x, y, action),
@@ -315,6 +318,84 @@ class IconView extends Gtk.Fixed {
             onMotion: (x, y) => this._onDragMotion(x, y),
             onLeave: () => this._clearDropHighlight(),
         });
+    }
+
+    // --- rubber band ---
+
+    /**
+     * Sweep a rectangle over empty desktop to select what it touches.
+     *
+     * The drag source lives on this same widget, so the two have to agree on
+     * who owns a press: a drag that starts on an icon moves that icon, a drag
+     * that starts on bare desktop draws a band. This gesture denies the
+     * sequence in the first case and lets the drag source have it.
+     */
+    _addRubberBand() {
+        const gesture = new Gtk.GestureDrag({button: Gdk.BUTTON_PRIMARY});
+
+        gesture.connect('drag-begin', (controller, startX, startY) => {
+            if (this._iconAt(startX, startY)) {
+                controller.set_state(Gtk.EventSequenceState.DENIED);
+                return;
+            }
+
+            controller.set_state(Gtk.EventSequenceState.CLAIMED);
+            this._bandAnchor = {x: startX, y: startY};
+            this._bandBase = (gesture.get_current_event_state() &
+                Gdk.ModifierType.CONTROL_MASK) !== 0
+                ? new Set(this._selection)
+                : new Set();
+
+            this._band = new Gtk.Box({css_classes: ['rubber-band']});
+            this._band.set_can_target(false);
+            this.put(this._band, startX, startY);
+        });
+
+        gesture.connect('drag-update', (_controller, offsetX, offsetY) =>
+            this._updateBand(offsetX, offsetY));
+
+        gesture.connect('drag-end', (_controller, offsetX, offsetY) => {
+            this._updateBand(offsetX, offsetY);
+            this._endBand();
+        });
+
+        // A cancelled gesture — the pointer leaving, another grab — must not
+        // leave the band painted on the desktop for ever.
+        gesture.connect('cancel', () => this._endBand());
+
+        this.add_controller(gesture);
+    }
+
+    _updateBand(offsetX, offsetY) {
+        if (!this._band)
+            return;
+
+        const rect = {
+            x: Math.min(this._bandAnchor.x, this._bandAnchor.x + offsetX),
+            y: Math.min(this._bandAnchor.y, this._bandAnchor.y + offsetY),
+            width: Math.abs(offsetX),
+            height: Math.abs(offsetY),
+        };
+
+        this.move(this._band, rect.x, rect.y);
+        this._band.set_size_request(Math.max(1, rect.width), Math.max(1, rect.height));
+
+        this._selection = new Set(this._bandBase);
+        for (const icon of this._icons) {
+            if (intersects(rect, icon.compute_bounds(this)[1]))
+                this._selection.add(icon.item.uri);
+        }
+        this._refreshSelection();
+    }
+
+    _endBand() {
+        if (!this._band)
+            return;
+
+        this.remove(this._band);
+        this._band = null;
+        this._bandAnchor = null;
+        this._bandBase = null;
     }
 
     // --- drag out ---
@@ -455,19 +536,20 @@ class IconView extends Gtk.Fixed {
             // the model to come back would mean waiting forever, and the icon
             // would snap back to where it started.
             item.position = position;
-            writePosition(item.file, position.x, position.y);
+            if (!item.special)
+                writePosition(item.file, position.x, position.y);
         }
 
         this._layout();
     }
 
     _onTextDropped(text, x, y) {
-        this._createDroppedFile('Dropped Text.txt',
+        this._createDroppedFile(_('Dropped Text.txt'),
             new TextEncoder().encode(text), x, y);
     }
 
     _onTextureDropped(texture, x, y) {
-        this._createDroppedFile('Dropped Image.png',
+        this._createDroppedFile(_('Dropped Image.png'),
             texture.save_to_png_bytes().get_data(), x, y);
     }
 
@@ -655,14 +737,6 @@ class IconView extends Gtk.Fixed {
             action.connect('activate', activate);
             this._actions.add_action(action);
         }
-        // Stateful: its value is the id of the current default application, so
-        // the Open With list can show a radio dot on the right entry.
-        this._defaultApp = Gio.SimpleAction.new_stateful('default-app',
-            GLib.VariantType.new('s'), GLib.Variant.new_string(''));
-        this._defaultApp.connect('activate',
-            (_action, parameter) => this._openWithApplication(parameter.deepUnpack()));
-        this._actions.add_action(this._defaultApp);
-
         this.insert_action_group('desktop', this._actions);
 
         // The background menu is the same whatever is under the pointer, so it
@@ -670,7 +744,7 @@ class IconView extends Gtk.Fixed {
         const background = new Gio.Menu();
 
         const create = new Gio.Menu();
-        create.append('New Folder', 'desktop.new-folder');
+        create.append(_('New Folder'), 'desktop.new-folder');
         background.append_section(null, create);
 
         // Five entries, and each one is the only way to reach what it does.
@@ -678,16 +752,16 @@ class IconView extends Gtk.Fixed {
         // (the desktop already is that folder), and Display Settings (nothing
         // to do with the desktop).
         const edit = new Gio.Menu();
-        edit.append('Paste', 'desktop.paste');
+        edit.append(_('Paste'), 'desktop.paste');
         background.append_section(null, edit);
 
         const open = new Gio.Menu();
-        open.append('Open in Terminal', 'desktop.open-terminal-here');
-        open.append('Tidy Up Icons', 'desktop.tidy-up');
+        open.append(_('Open in Terminal'), 'desktop.open-terminal-here');
+        open.append(_('Tidy Up Icons'), 'desktop.tidy-up');
         background.append_section(null, open);
 
         const settings = new Gio.Menu();
-        settings.append('Change Background…', 'desktop.change-background');
+        settings.append(_('Change Background…'), 'desktop.change-background');
         background.append_section(null, settings);
 
         this._menu = new Gtk.PopoverMenu({has_arrow: false, halign: Gtk.Align.START});
@@ -697,9 +771,6 @@ class IconView extends Gtk.Fixed {
 
     _popupItemMenu(x, y) {
         const items = this.selectedItems;
-        if (items.length === 1)
-            this._defaultApp.set_state(GLib.Variant.new_string(defaultApplicationId(items[0])));
-
         const available = actionAvailability(items);
         for (const [name, enabled] of Object.entries(available))
             this._actions.lookup_action(name)?.set_enabled(enabled);
@@ -723,6 +794,10 @@ class IconView extends Gtk.Fixed {
             'open-with': () => this._openWith(),
             'open-terminal': () => this._openTerminalInSelection(),
             'rename': () => this._renameSelection(),
+            'empty-trash': () => this._operations.emptyTrash(),
+            'run': () => this._runSelection(false),
+            'run-as-root': () => this._runSelection(true),
+            'eject': () => this._ejectSelection(),
             'cut': () => this._toClipboard('cut'),
             'copy': () => this._toClipboard('copy'),
             'paste': () => this._paste(),
@@ -737,6 +812,30 @@ class IconView extends Gtk.Fixed {
             'open-terminal-here': () => openTerminal(this._directory),
             'change-background': () => launchSettings('background'),
         };
+    }
+
+    _runSelection(asRoot) {
+        const [item] = this.selectedItems;
+        if (item)
+            runInTerminal(item.file, asRoot);
+    }
+
+    _ejectSelection() {
+        const [item] = this.selectedItems;
+        const {mount} = item ?? {};
+        if (!mount)
+            return;
+
+        // Eject is for removable media; unmount is the rest. Asking for the
+        // wrong one fails, so pick by what the mount says it can do.
+        const operation = new Gtk.MountOperation({parent: this.get_root()});
+        if (mount.can_eject()) {
+            mount.eject_with_operation(Gio.MountUnmountFlags.NONE, operation, null,
+                (source, result) => reportUnmount(source, () => source.eject_with_operation_finish(result)));
+        } else {
+            mount.unmount_with_operation(Gio.MountUnmountFlags.NONE, operation, null,
+                (source, result) => reportUnmount(source, () => source.unmount_with_operation_finish(result)));
+        }
     }
 
     _renameSelection() {
@@ -782,7 +881,8 @@ class IconView extends Gtk.Fixed {
     _tidyUp() {
         for (const icon of this._icons) {
             icon.item.position = null;
-            clearPosition(icon.item.file);
+            if (!icon.item.special)
+                clearPosition(icon.item.file);
         }
 
         this._layout();
@@ -834,39 +934,7 @@ class IconView extends Gtk.Fixed {
 
     _newFolder() {
         this._operations.createFolder(this._directory.get_uri(),
-            uniqueName(this._directory, 'Untitled Folder'));
-    }
-
-    /**
-     * Make the chosen application the default for this type, then open with it.
-     *
-     * @param {string} applicationId - a desktop file id
-     */
-    _openWithApplication(applicationId) {
-        const [item] = this.selectedItems;
-        if (!item)
-            return;
-
-        const application = Gio.DesktopAppInfo.new(applicationId);
-        if (!application) {
-            printerr(`iconView: no application with id ${applicationId}`);
-            return;
-        }
-
-        const type = item.isDirectory ? 'inode/directory' : item.contentType;
-        try {
-            application.set_as_default_for_type(type);
-        } catch (error) {
-            printerr(`iconView: cannot make ${applicationId} the default: ${error.message}`);
-        }
-
-        const context = this.get_display().get_app_launch_context();
-        context.set_timestamp(Gdk.CURRENT_TIME);
-        try {
-            application.launch_uris([item.uri], context);
-        } catch (error) {
-            printerr(`iconView: cannot open with ${applicationId}: ${error.message}`);
-        }
+            uniqueName(this._directory, _('Untitled Folder')));
     }
 
     _openWith() {
@@ -874,13 +942,68 @@ class IconView extends Gtk.Fixed {
         if (!item)
             return;
 
-        // Nautilus owns the "choose an application" experience; reuse it rather
-        // than building a second, worse chooser.
-        const dialog = new Gtk.FileLauncher({file: item.file});
-        dialog.set_always_ask(true);
-        dialog.launch(this.get_root(), null, null);
+        const dialog = new OpenWithDialog({
+            item,
+            application: this.get_root()?.application ?? null,
+            onChoose: (application, alwaysUse) =>
+                this._launchWith(item, application, alwaysUse),
+        });
+        dialog.present();
+    }
+
+    /**
+     * @param {object} item - what to open
+     * @param {Gio.AppInfo} application - what to open it with
+     * @param {boolean} alwaysUse - whether to make it the default for the type
+     */
+    _launchWith(item, application, alwaysUse) {
+        const type = item.isDirectory ? 'inode/directory' : item.contentType;
+
+        if (alwaysUse) {
+            try {
+                application.set_as_default_for_type(type);
+            } catch (error) {
+                printerr(`iconView: cannot make ${application.get_id()} the default: ${error.message}`);
+            }
+        }
+
+        const context = this.get_display().get_app_launch_context();
+        context.set_timestamp(Gdk.CURRENT_TIME);
+        try {
+            application.launch_uris([item.uri], context);
+        } catch (error) {
+            printerr(`iconView: cannot open with ${application.get_id()}: ${error.message}`);
+        }
     }
 });
+
+/**
+ * @param {Gio.Mount} mount - the mount being released
+ * @param {Function} finish - the matching finish call
+ */
+function reportUnmount(mount, finish) {
+    try {
+        finish();
+    } catch (error) {
+        if (!error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.FAILED_HANDLED))
+            printerr(`iconView: cannot eject ${mount.get_name()}: ${error.message}`);
+    }
+}
+
+/**
+ * @param {object} rect - a rectangle in view coordinates
+ * @param {?Graphene.Rect} bounds - a widget's bounds, or null if unallocated
+ * @returns {boolean} whether the two overlap at all
+ */
+function intersects(rect, bounds) {
+    if (!bounds)
+        return false;
+
+    return rect.x < bounds.get_x() + bounds.get_width() &&
+        bounds.get_x() < rect.x + rect.width &&
+        rect.y < bounds.get_y() + bounds.get_height() &&
+        bounds.get_y() < rect.y + rect.height;
+}
 
 /**
  * @param {number} value - the number to bound

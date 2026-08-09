@@ -16,6 +16,8 @@ import Gdk from 'gi://Gdk';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 
+import {_} from './gettext.js';
+
 export const RenamePopover = GObject.registerClass(
 class RenamePopover extends Gtk.Popover {
     _init(params) {
@@ -41,7 +43,7 @@ class RenamePopover extends Gtk.Popover {
         this._entry.add_controller(keys);
 
         const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 6});
-        box.append(new Gtk.Label({label: 'Rename', xalign: 0, css_classes: ['heading']}));
+        box.append(new Gtk.Label({label: _('Rename'), xalign: 0, css_classes: ['heading']}));
         box.append(this._entry);
         this.set_child(box);
     }

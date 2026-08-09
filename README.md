@@ -23,8 +23,13 @@ and it undoes what you just did on the desktop.
 - A context menu that changes with what you click: the first entry names the
   application that will open the file, folders offer a terminal, pictures offer
   to become the wallpaper, and an untrusted launcher offers to be trusted
+- Home, the wastebasket (empty or full) and mounted drives, each switchable
 - Drag icons where you want them; positions are remembered per file, and per
   monitor. Drag files out to any application, and drop files, text or images in
+- Sweep a rectangle over empty desktop to select; type a few letters to jump
+- Rename with F2; run scripts in a terminal, as yourself or with sudo
+- Open With lists everything registered for the type *and* everything else
+  installed, with one switch to make the choice permanent
 - Cut, copy and paste that interoperates with Files, sharing its undo stack
 - Selection with click, Ctrl-click and Ctrl+A; arrow keys, Enter and Delete
 
@@ -127,11 +132,13 @@ sudo sysctl -w fs.inotify.max_user_instances=1024
 
 ## Status
 
-Working: the grid, icons, thumbnails, selection, keyboard, context menus, the
-Nautilus operations, drag-and-drop, clipboard, and saved icon positions.
+Working: the grid, icons, thumbnails, selection including rubber-band and
+type-ahead, keyboard, context menus, the Nautilus operations, drag-and-drop,
+clipboard, saved icon positions, Home/wastebasket/volumes, rename, running
+scripts, preferences, and translation plumbing (`make pot`).
 
-Not yet: inline rename, rubber-band selection, the Home and Trash desktop items,
-mounted volumes, and a preferences window. See `PLAN.md`.
+Not yet: no translations exist yet — only the catalogue template. See `PLAN.md`
+for the rest.
 
 ## Author
 

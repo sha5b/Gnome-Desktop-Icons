@@ -26,6 +26,20 @@ const FALLBACK_TERMINALS = [
     'xterm',
 ];
 
+// How each terminal is told "and then run this". There is no standard for it;
+// `--` is the modern spelling and `-e` the old one, and they are not
+// interchangeable — konsole and xterm only understand `-e`.
+const EXEC_FLAGS = {
+    'ptyxis': ['--'],
+    'kgx': ['--'],
+    'gnome-terminal': ['--'],
+    'xfce4-terminal': ['-x'],
+    'konsole': ['-e'],
+    'alacritty': ['-e'],
+    'xterm': ['-e'],
+    'foot': [],
+};
+
 const TERMINAL_SCHEMA = 'org.gnome.desktop.default-applications.terminal';
 
 /**
@@ -42,6 +56,56 @@ export function openTerminal(directory) {
     for (const command of candidates()) {
         if (spawn(command, path))
             return true;
+    }
+
+    printerr('terminal: no terminal emulator found');
+    return false;
+}
+
+/**
+ * Run a script in a terminal window, optionally as root.
+ *
+ * The terminal is kept open after the script finishes. A script that fails in
+ * a window that vanishes with it is a script that cannot be debugged, and the
+ * whole point of running it in a terminal rather than silently is to watch what
+ * it does.
+ *
+ * As root it uses plain `sudo`, which asks for the password in that terminal.
+ * pkexec would pop a graphical prompt instead, but it also scrubs the
+ * environment and refuses anything without a policy file, which is the wrong
+ * behaviour for "run this script of mine".
+ *
+ * @param {Gio.File} script - the file to run
+ * @param {boolean} asRoot - whether to run it under sudo
+ * @returns {boolean} whether a terminal was launched
+ */
+export function runInTerminal(script, asRoot) {
+    const path = script.get_path();
+    if (!path) {
+        printerr('terminal: refusing to run a script from a non-local location');
+        return false;
+    }
+
+    const directory = script.get_parent()?.get_path() ?? GLib.get_home_dir();
+    const quoted = GLib.shell_quote(path);
+    const command = asRoot ? `sudo ${quoted}` : quoted;
+    // Keep the window open on exit, and say why it closed.
+    const shellScript = `${command}; status=$?; echo; ` +
+        'echo "[exited with $status — press Enter to close]"; read _';
+
+    for (const terminal of candidates()) {
+        if (!GLib.find_program_in_path(terminal))
+            continue;
+
+        const flags = EXEC_FLAGS[terminal] ?? ['--'];
+        const argv = [terminal, ...flags, 'bash', '-c', shellScript];
+
+        try {
+            GLib.spawn_async(directory, argv, null, GLib.SpawnFlags.SEARCH_PATH, null);
+            return true;
+        } catch (error) {
+            printerr(`terminal: ${terminal} could not run the script: ${error.message}`);
+        }
     }
 
     printerr('terminal: no terminal emulator found');

@@ -135,8 +135,29 @@ that already has the other shell-process files). Our sources parse cleanly under
 re-checking against a newer shexli before uploading, in case the server-side
 check trips over the same thing.
 
-**Resume here:** inline rename, rubber-band selection, the Home/Trash/volume
-items, and `prefs.js`.
+**M3, M4, M6 and M7 are now essentially complete.** Added since: rubber-band
+selection, type-ahead, inline rename, Home/wastebasket/volumes as desktop items
+with an Empty Wastebasket and Eject, Run in Terminal and Run as Administrator
+for scripts, an Open With *window* listing associated and all installed
+applications with an "always use" switch, `prefs.js`, and gettext plumbing with
+`make pot`.
+
+Bugs found by running it, each fixed:
+
+- Applications launched with a null `GAppLaunchContext` never got the display
+  environment, so some came up at the wrong scale.
+- `GtkDropTarget::motion` was returning a mask of three actions where GTK
+  demands exactly one.
+- `make run` hid `~/.local/share`, so Flatpak-exported MIME icons vanished.
+- `String.prototype.format` does not exist in an ES module — the gettext work
+  briefly broke every item menu with it.
+- A drag source on the icon is cancelled by the view's click gesture; both must
+  live on the same widget.
+- A metadata write does not fire the directory monitor, so a drop must re-lay
+  out the view itself.
+
+**Resume here:** actual translations (only the `.pot` exists), and a real-mouse
+pass over drag-out, rename and Run.
 
 ## 1. Verified environment
 

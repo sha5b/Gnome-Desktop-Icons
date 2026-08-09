@@ -10,7 +10,20 @@
 // the menu is rebuilt on every click from the selection in front of it.
 
 import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
+
+import {_, format, ngettext} from './gettext.js';
+
+// Things that can sensibly be *run* rather than opened. Executability alone is
+// not the test: a .sh the user never chmod'ed is still a script they mean to
+// run, and running it through its interpreter needs no permission change.
+const SCRIPT_TYPES = new Set([
+    'application/x-shellscript', 'text/x-shellscript',
+    'application/x-python', 'text/x-python', 'text/x-python3',
+    'application/x-perl', 'text/x-perl',
+    'application/x-ruby', 'text/x-ruby',
+    'application/x-lua', 'text/x-lua',
+    'application/x-executable', 'application/x-sharedlib',
+]);
 
 // Content types we can act on beyond opening. Kept explicit rather than
 // pattern-matched on the string: "image/" would sweep in things like
@@ -27,6 +40,10 @@ const WALLPAPER_TYPES = new Set([
 export function buildItemMenu(items) {
     const menu = new Gio.Menu();
     const single = items.length === 1 ? items[0] : null;
+    // Home, the wastebasket and volumes are not files in this folder. Renaming
+    // or trashing them is meaningless, so those entries are simply absent
+    // rather than present and greyed.
+    const editable = items.every(item => !item.special);
 
     menu.append_section(null, openSection(items, single));
 
@@ -34,20 +51,22 @@ export function buildItemMenu(items) {
     if (specific.get_n_items() > 0)
         menu.append_section(null, specific);
 
-    // Cut and Copy earn their place even though Ctrl+X and Ctrl+C exist: Paste
-    // lives in the background menu, and a paste with no discoverable copy is a
-    // dead end. "Show in Files" does not — the desktop already *is* that folder.
-    const edit = new Gio.Menu();
-    edit.append('Cut', 'desktop.cut');
-    edit.append('Copy', 'desktop.copy');
-    if (single)
-        edit.append('Rename…', 'desktop.rename');
-    edit.append(items.length > 1 ? `Move ${items.length} Items to Trash` : 'Move to Trash',
-        'desktop.trash');
-    menu.append_section(null, edit);
+    if (editable) {
+        // Cut and Copy earn their place even though Ctrl+X and Ctrl+C exist:
+        // Paste lives in the background menu, and a paste with no discoverable
+        // copy is a dead end.
+        const edit = new Gio.Menu();
+        edit.append(_('Cut'), 'desktop.cut');
+        edit.append(_('Copy'), 'desktop.copy');
+        if (single)
+            edit.append(_('Rename…'), 'desktop.rename');
+        edit.append(items.length > 1 ? format(ngettext('Move %d Item to Trash', 'Move %d Items to Trash', items.length), items.length) : _('Move to Trash'),
+            'desktop.trash');
+        menu.append_section(null, edit);
+    }
 
     const info = new Gio.Menu();
-    info.append('Properties', 'desktop.properties');
+    info.append(_('Properties'), 'desktop.properties');
     menu.append_section(null, info);
 
     return menu;
@@ -65,65 +84,16 @@ function openSection(items, single) {
     // happen before it happens.
     const handler = single ? defaultHandler(single) : null;
     if (handler)
-        section.append(`Open with ${handler.get_display_name()}`, 'desktop.open');
+        section.append(format(_('Open with %s'), handler.get_display_name()), 'desktop.open');
     else if (items.length > 1)
-        section.append(`Open ${items.length} Items`, 'desktop.open');
+        section.append(format(ngettext('Open %d Item', 'Open %d Items', items.length), items.length), 'desktop.open');
     else
-        section.append('Open', 'desktop.open');
+        section.append(_('Open'), 'desktop.open');
 
     if (single)
-        section.append_submenu('Open With', openWithMenu(single));
+        section.append(_('Open With…'), 'desktop.open-with');
 
     return section;
-}
-
-/**
- * Every application registered for this file's type.
- *
- * The entries are radio items bound to one stateful action, with the dot on
- * whichever application is currently the default. Activating an entry makes
- * that application the default *and* opens the file with it — which is what
- * picking an application from this list is nearly always meant to do, and it
- * saves a second trip through a dialog to make the choice stick.
- *
- * @param {object} item - the selected item
- * @returns {Gio.Menu} the submenu
- */
-function openWithMenu(item) {
-    const menu = new Gio.Menu();
-    const type = item.isDirectory ? 'inode/directory' : item.contentType;
-
-    // Recommended applications first — the ones that registered for this exact
-    // type — then anything else that merely claims to cope with it.
-    const seen = new Set();
-    const applications = [
-        ...Gio.AppInfo.get_recommended_for_type(type),
-        ...Gio.AppInfo.get_all_for_type(type),
-    ].filter(application => {
-        const id = application.get_id();
-        if (!id || seen.has(id) || !application.should_show())
-            return false;
-
-        seen.add(id);
-        return true;
-    });
-
-    const applicationSection = new Gio.Menu();
-    for (const application of applications) {
-        const entry = Gio.MenuItem.new(application.get_display_name(), null);
-        entry.set_action_and_target_value('desktop.default-app',
-            new GLib.Variant('s', application.get_id()));
-        applicationSection.append_item(entry);
-    }
-
-    if (applications.length > 0)
-        menu.append_section(null, applicationSection);
-
-    const other = new Gio.Menu();
-    other.append('Other Application…', 'desktop.open-with');
-    menu.append_section(null, other);
-
-    return menu;
 }
 
 /**
@@ -135,26 +105,51 @@ function contextSection(single) {
     if (!single)
         return section;
 
-    if (single.isDirectory)
-        section.append('Open in Terminal', 'desktop.open-terminal');
+    if (single.special === 'trash') {
+        const item = Gio.MenuItem.new(_('Empty Wastebasket'), 'desktop.empty-trash');
+        section.append_item(item);
+        return section;
+    }
 
-    if (WALLPAPER_TYPES.has(single.contentType))
-        section.append('Set as Background', 'desktop.set-background');
+    if (single.special === 'volume') {
+        if (single.canEject)
+            section.append(_('Eject'), 'desktop.eject');
+        section.append(_('Open in Terminal'), 'desktop.open-terminal');
+        return section;
+    }
+
+    if (single.isDirectory)
+        section.append(_('Open in Terminal'), 'desktop.open-terminal');
+
+    if (isRunnable(single)) {
+        section.append(_('Run in Terminal'), 'desktop.run');
+        section.append(_('Run as Administrator'), 'desktop.run-as-root');
+    }
+
+    if (!single.special && WALLPAPER_TYPES.has(single.contentType))
+        section.append(_('Set as Background'), 'desktop.set-background');
 
     // An unexecutable desktop entry is just a text file until the user says
     // otherwise — the same guard Files puts in front of launchers.
     if (single.contentType === 'application/x-desktop' && !single.isExecutable)
-        section.append('Allow Launching', 'desktop.allow-launching');
+        section.append(_('Allow Launching'), 'desktop.allow-launching');
 
     return section;
 }
 
 /**
  * @param {object} item - a FileModel item
- * @returns {string} the id of its default application, or "" if it has none
+ * @returns {boolean} whether "Run in Terminal" makes sense for it
  */
-export function defaultApplicationId(item) {
-    return defaultHandler(item)?.get_id() ?? '';
+export function isRunnable(item) {
+    if (item.special || item.isDirectory)
+        return false;
+
+    // A desktop entry is launched, not run in a shell; it has its own menu item.
+    if (item.contentType === 'application/x-desktop')
+        return false;
+
+    return SCRIPT_TYPES.has(item.contentType) || item.isExecutable;
 }
 
 /**
@@ -180,17 +175,23 @@ export function defaultHandler(item) {
 export function actionAvailability(items) {
     const single = items.length === 1 ? items[0] : null;
 
+    const editable = items.every(item => !item.special);
+
     return {
         'open-terminal': Boolean(single?.isDirectory),
+        'empty-trash': single?.special === 'trash' && !single.trashEmpty,
+        'run': Boolean(single && isRunnable(single)),
+        'run-as-root': Boolean(single && isRunnable(single)),
+        'eject': Boolean(single?.special === 'volume' && single.canEject),
         'set-background': Boolean(single && WALLPAPER_TYPES.has(single.contentType)),
         'allow-launching': Boolean(single &&
             single.contentType === 'application/x-desktop' && !single.isExecutable),
-        'open-with': Boolean(single),
-        'rename': Boolean(single),
+        'open-with': Boolean(single && !single.special),
+        'rename': Boolean(single && !single.special),
         'open': items.length > 0,
-        'cut': items.length > 0,
-        'copy': items.length > 0,
-        'trash': items.length > 0,
+        'cut': items.length > 0 && editable,
+        'copy': items.length > 0 && editable,
+        'trash': items.length > 0 && editable,
         'properties': items.length > 0,
     };
 }

@@ -16,15 +16,20 @@ import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
 import System from 'system';
 
+import {initTranslations} from './gettext.js';
 import {DesktopWindow} from './desktopWindow.js';
 import {FileModel} from './fileModel.js';
 import {Ipc} from './ipc.js';
 import {NautilusOps} from './nautilusOps.js';
+import {SpecialItems} from './specialItems.js';
 import {ThumbnailLoader} from './thumbnails.js';
 import {isTrustedLauncher} from './iconView.js';
 
 const APPLICATION_ID = 'io.github.sha5b.GnomeDesktopIcons';
 const HELPER_DIR = Gio.File.new_for_uri(import.meta.url).get_parent();
+
+// Before any module builds a user-visible string.
+initTranslations(HELPER_DIR.get_parent().get_child('locale').get_path());
 
 // Logical pixels. GTK multiplies these by the monitor's scale factor itself, so
 // one set of numbers is right on every display.
@@ -50,8 +55,9 @@ class DesktopHelper {
         this._operations = new NautilusOps();
         this._model = new FileModel({
             directory: this._directory,
-            onChanged: items => this._setItems(items),
+            onChanged: () => this._publishItems(),
         });
+        this._special = new SpecialItems(() => this._publishItems());
 
         this._application = new Adw.Application({
             application_id: APPLICATION_ID,
@@ -117,6 +123,7 @@ class DesktopHelper {
 
     _shutdown() {
         this._model.stop();
+        this._special.destroy();
         this._thumbnails.destroy();
         this._operations.destroy();
 
@@ -177,7 +184,8 @@ class DesktopHelper {
             }
 
             window.setGeometry(monitor);
-            window.setItems(this._directory, this._model.items);
+            window.setItems(this._directory,
+                [...this._special.list(), ...this._model.items]);
             window.present();
         }
 
@@ -189,13 +197,20 @@ class DesktopHelper {
         }
     }
 
-    _setItems(items) {
+    /** Home, the wastebasket and volumes first, then the folder's own files. */
+    _publishItems() {
+        const items = [...this._special.list(), ...this._model.items];
         for (const window of this._windows.values())
             window.setItems(this._directory, items);
     }
 
-    _setSettings({iconSize, showHidden}) {
+    _setSettings({iconSize, showHidden, showHome, showTrash, showVolumes}) {
         this._model.setShowHidden(showHidden);
+        this._special.setVisibility({
+            home: showHome,
+            trash: showTrash,
+            volumes: showVolumes,
+        });
 
         const size = ICON_SIZES[iconSize] ?? DEFAULT_ICON_SIZE;
         if (size === this._iconSize)

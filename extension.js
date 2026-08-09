@@ -79,6 +79,9 @@ export default class DesktopIconsExtension extends Extension {
             type: 'settings',
             iconSize: this._settings.get_string('icon-size'),
             showHidden: this._settings.get_boolean('show-hidden'),
+            showHome: this._settings.get_boolean('show-home'),
+            showTrash: this._settings.get_boolean('show-trash'),
+            showVolumes: this._settings.get_boolean('show-volumes'),
         });
     }
 

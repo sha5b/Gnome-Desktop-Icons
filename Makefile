@@ -3,10 +3,11 @@
 
 UUID           := gnome-desktop-icons@ned.tabulov.gmail.com
 SCHEMA_ID      := org.gnome.shell.extensions.gnome-desktop-icons
+GETTEXT_DOMAIN := gnome-desktop-icons
 EXTENSIONS_DIR := $(HOME)/.local/share/gnome-shell/extensions
 INSTALL_PATH   := $(EXTENSIONS_DIR)/$(UUID)
 
-.PHONY: all schemas install uninstall lint check helper run devkit pack clean
+.PHONY: all schemas install uninstall lint check helper run devkit pot pack clean
 
 all: schemas
 
@@ -95,3 +96,13 @@ pack: schemas
 
 clean:
 	rm -f schemas/gschemas.compiled $(UUID).shell-extension.zip
+
+## Extract translatable strings into locale/gnome-desktop-icons.pot.
+pot:
+	xgettext --from-code=UTF-8 --language=JavaScript \
+		--keyword=_ --keyword=ngettext:1,2 \
+		--package-name="Gnome Desktop Icons" \
+		--copyright-holder="Shahab Nedaei" \
+		--output=locale/$(GETTEXT_DOMAIN).pot \
+		$$(git ls-files 'helper/*.js' 'src/*.js' extension.js prefs.js)
+	@echo "wrote locale/$(GETTEXT_DOMAIN).pot"

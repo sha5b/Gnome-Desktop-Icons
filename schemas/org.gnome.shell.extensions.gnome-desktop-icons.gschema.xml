@@ -18,5 +18,20 @@
       <summary>Show hidden files</summary>
       <description>Draw files whose name starts with a dot.</description>
     </key>
+    <key name="show-home" type="b">
+      <default>true</default>
+      <summary>Show the Home folder</summary>
+      <description>Draw an icon for the user's home folder.</description>
+    </key>
+    <key name="show-trash" type="b">
+      <default>true</default>
+      <summary>Show the wastebasket</summary>
+      <description>Draw an icon for the wastebasket, full or empty.</description>
+    </key>
+    <key name="show-volumes" type="b">
+      <default>true</default>
+      <summary>Show mounted volumes</summary>
+      <description>Draw an icon for each mounted drive.</description>
+    </key>
   </schema>
 </schemalist>

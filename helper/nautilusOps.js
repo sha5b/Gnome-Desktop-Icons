@@ -111,6 +111,12 @@ export class NautilusOps {
             new GLib.Variant('(ssa{sv})', [uri, newName, {}]));
     }
 
+    /** Empty the wastebasket, with Nautilus's confirmation dialog. */
+    async emptyTrash() {
+        await this._callReporting(OPERATIONS, 'EmptyTrash',
+            new GLib.Variant('(ba{sv})', [true, {}]));
+    }
+
     /** Reverse the last operation, on the stack shared with Files. */
     async undo() {
         await this._callReporting(OPERATIONS, 'Undo', new GLib.Variant('(a{sv})', [{}]));

@@ -13,12 +13,12 @@ import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 
-import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const ICON_SIZES = [
-    {value: 'small', title: 'Small'},
-    {value: 'standard', title: 'Standard'},
-    {value: 'large', title: 'Large'},
+    {value: 'small', title: _('Small')},
+    {value: 'standard', title: _('Standard')},
+    {value: 'large', title: _('Large')},
 ];
 
 export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
@@ -29,18 +29,17 @@ export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
         const settings = this.getSettings();
 
         const page = new Adw.PreferencesPage({
-            title: 'Desktop',
+            title: _('Desktop'),
             icon_name: 'user-desktop-symbolic',
         });
 
         const group = new Adw.PreferencesGroup({
-            title: 'Icons',
-            description: 'Click behaviour follows Files, so the desktop and ' +
-                'file windows always agree.',
+            title: _('Icons'),
+            description: _('Click behaviour follows Files, so the desktop and file windows always agree.'),
         });
 
         const iconSize = new Adw.ComboRow({
-            title: 'Icon Size',
+            title: _('Icon Size'),
             model: Gtk.StringList.new(ICON_SIZES.map(size => size.title)),
             selected: indexOfValue(settings.get_string('icon-size')),
         });
@@ -49,14 +48,31 @@ export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
         group.add(iconSize);
 
         const showHidden = new Adw.SwitchRow({
-            title: 'Show Hidden Files',
-            subtitle: 'Files whose name begins with a dot',
+            title: _('Show Hidden Files'),
+            subtitle: _('Files whose name begins with a dot'),
         });
         settings.bind('show-hidden', showHidden, 'active',
             Gio.SettingsBindFlags.DEFAULT);
         group.add(showHidden);
 
         page.add(group);
+
+        const items = new Adw.PreferencesGroup({
+            title: _('Show on the Desktop'),
+            description: _('Places that are not files in the Desktop folder.'),
+        });
+
+        for (const [key, title, subtitle] of [
+            ['show-home', _('Home'), _('Your home folder')],
+            ['show-trash', _('Wastebasket'), _('Shows whether it is empty or full')],
+            ['show-volumes', _('Mounted Drives'), _('USB sticks, discs and other mounts')],
+        ]) {
+            const row = new Adw.SwitchRow({title, subtitle});
+            settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
+            items.add(row);
+        }
+
+        page.add(items);
         window.add(page);
     }
 }

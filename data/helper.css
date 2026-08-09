@@ -67,3 +67,11 @@ window.desktop-window,
 .icon-view.dragging .desktop-icon.selected {
   opacity: 0.4;
 }
+
+/* The sweep rectangle. Deliberately faint: it is drawn over the wallpaper and
+   over the icons it is selecting, and it should not hide either. */
+.rubber-band {
+  background-color: alpha(@accent_bg_color, 0.25);
+  border: 1px solid @accent_bg_color;
+  border-radius: 2px;
+}
