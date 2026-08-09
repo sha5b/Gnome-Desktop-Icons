@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 
-UUID           := desktop-icons-50@fiber-elements.com
-SCHEMA_ID      := org.gnome.shell.extensions.desktop-icons-50
+UUID           := gnome-desktop-icons@ned.tabulov.gmail.com
+SCHEMA_ID      := org.gnome.shell.extensions.gnome-desktop-icons
 EXTENSIONS_DIR := $(HOME)/.local/share/gnome-shell/extensions
 INSTALL_PATH   := $(EXTENSIONS_DIR)/$(UUID)
 
-.PHONY: all schemas install uninstall lint check helper devkit pack clean
+.PHONY: all schemas install uninstall lint check helper run devkit pack clean
 
 all: schemas
 
@@ -45,8 +46,38 @@ check:
 helper:
 	gjs -m helper/main.js
 
-## Nested development shell. The session shell cannot be restarted on Wayland,
-## so all iteration happens here. Watch logs with: journalctl --user -f
+## Run it in a nested shell WITHOUT installing anything.
+##
+## Everything lives in a throwaway profile: its own XDG_DATA_HOME holding a
+## symlink to this checkout, its own settings, its own session bus. Your real
+## ~/.local/share and your real extension list are never touched, and the whole
+## profile is deleted when the shell exits. Needs: sudo dnf install mutter-devkit
+##
+##   make run              plain
+##   make run DEBUG=1      with lifecycle tracing on stderr
+##
+## The thumbnail cache is shared with the real session on purpose, so a test run
+## does not regenerate every thumbnail from scratch.
+run: schemas
+	@profile=$$(mktemp -d /tmp/$(UUID).XXXXXX); \
+	mkdir -p $$profile/data/gnome-shell/extensions $$profile/config/glib-2.0/settings; \
+	ln -sfn $(CURDIR) $$profile/data/gnome-shell/extensions/$(UUID); \
+	{ echo "[org/gnome/shell]"; \
+	  echo "enabled-extensions=['$(UUID)']"; \
+	  echo "disable-user-extensions=false"; \
+	  echo "welcome-dialog-last-shown-version='50.4'"; } \
+	  > $$profile/config/glib-2.0/settings/keyfile; \
+	echo "scratch profile: $$profile"; \
+	XDG_DATA_HOME=$$profile/data \
+	XDG_CONFIG_HOME=$$profile/config \
+	XDG_CACHE_HOME=$(HOME)/.cache \
+	GSETTINGS_BACKEND=keyfile \
+	GNOME_DESKTOP_ICONS_DEBUG=$(DEBUG) \
+	dbus-run-session -- gnome-shell --devkit --wayland --wayland-display=$(UUID); \
+	rm -rf $$profile; \
+	echo "scratch profile removed"
+
+## Same, but against the installed copy in your real profile.
 devkit: install
 	SHELL_DEBUG=all G_MESSAGES_DEBUG=all \
 		dbus-run-session -- gnome-shell --devkit --wayland

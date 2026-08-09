@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Every use of a GNOME Shell *internal* API lives in this file. Mutter, GLib,
 // Gio and GObject are stable platform libraries and may be used anywhere else

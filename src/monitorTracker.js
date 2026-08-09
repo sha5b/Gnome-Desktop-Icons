@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Watches monitor layout, work areas and scale, and reports a plain-object
 // snapshot the helper process can consume over IPC.

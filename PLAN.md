@@ -54,8 +54,8 @@ in a devkit shell:
   *not*: Mutter still has the signal but there is no getter and nothing in a
   stock GNOME 50 session ever sets it.
 - Two permanent dev tools replace the throwaway probe, both off unless asked
-  for: `DESKTOP_ICONS_50_DEBUG=1` traces lifecycle to the journal, and
-  `DESKTOP_ICONS_50_DEBUG_SHOT=<path>` writes a screenshot of the stage — the
+  for: `GNOME_DESKTOP_ICONS_DEBUG=1` traces lifecycle to the journal, and
+  `GNOME_DESKTOP_ICONS_DEBUG_SHOT=<path>` writes a screenshot of the stage — the
   only way to see a nested shell, since the Screenshot D-Bus method refuses
   every caller but the shell's own UI.
 - `make lint` is clean against the flat ESLint config; `make check` parses every
@@ -93,8 +93,50 @@ machine had 135 instances against a limit of 128. Raised at runtime with
 `sudo sysctl -w fs.inotify.max_user_instances=1024`. The helper now treats a
 missing monitor as loss of live updates rather than a fatal error.
 
-**Resume here:** M5 — drag and drop. Also outstanding from M3/M4: saved icon
-positions, the Home/Trash/volume items, inline rename, and cut/copy/paste.
+**M5 done, and renamed.** The extension is now *Gnome Desktop Icons*,
+uuid `gnome-desktop-icons@ned.tabulov.gmail.com`, by Shahab Nedaei.
+
+- Drag out offers `text/uri-list`, `x-special/gnome-copied-files` and plain
+  text. Drop in accepts files, text and images; the last two are written into
+  ~/Desktop as new files.
+- Icon positions persist in `metadata::nautilus-icon-position` as global logical
+  coordinates, which encodes both where an icon is and which monitor it is on.
+  A position belonging to a monitor that is gone fails the bounds test and the
+  icon falls back to automatic placement.
+- Cut/copy/paste share the clipboard formats Files uses, so the copy/cut intent
+  survives between the two.
+
+Three bugs found while building it:
+
+1. **A drag source on the icon never fires.** The view's click gesture claims
+   the button press first, which cancels the child's gesture before it reaches
+   GTK's drag threshold. Both controllers now live on the view, which hit-tests
+   in `prepare`; GTK then arbitrates properly — click wins a tap, drag wins a
+   pull.
+2. **A metadata write is not a file change.** The directory monitor never fires
+   for it, so after a drop the view has to re-lay-out itself; waiting for the
+   model meant the icon snapped back.
+3. **Multi-monitor layout used global coordinates** for a widget whose own
+   coordinates are monitor-local, so everything on a second monitor would have
+   been laid out past the right-hand edge of the world.
+
+**Two things to know before uploading to extensions.gnome.org.**
+
+`shexli`, the official pre-upload analyzer, reports **EGO-P-007**: "Some
+JavaScript files are not reachable from `extension.js` or `prefs.js` imports" —
+every file under `helper/`. That is correct and unavoidable: the helper is
+spawned as a subprocess, not imported. It needs an explanation in the review
+notes, not a fix.
+
+`shexli` 0.2.1 also **segfaults** on the full tree (a crash inside its
+tree-sitter parser, reproducible by adding `src/windowLayering.js` to a tree
+that already has the other shell-process files). Our sources parse cleanly under
+`node --check`, ESLint and GJS itself, so this is a bug in the tool. Worth
+re-checking against a newer shexli before uploading, in case the server-side
+check trips over the same thing.
+
+**Resume here:** inline rename, rubber-band selection, the Home/Trash/volume
+items, and `prefs.js`.
 
 ## 1. Verified environment
 
@@ -270,10 +312,10 @@ Rules from the review guidelines and best-practices pages that shape the build:
   used, so my earlier draft was wrong to include it
 - Schema id must be based on `org.gnome.shell.extensions`
 - Schema file named `<schema-id>.gschema.xml`
-- Id used is `org.gnome.shell.extensions.desktop-icons-50`, not the plain
+- Id used is `org.gnome.shell.extensions.gnome-desktop-icons`, not the plain
   `…extensions.desktop` this plan first sketched. GSettings ids are global, and
   `desktop` is too likely to collide with another extension
-- UUID: `desktop-icons-50@fiber-elements.com`
+- UUID: `gnome-desktop-icons@ned.tabulov.gmail.com`
 - No `gnome.org` namespace in the UUID
 
 **Code style**
@@ -435,7 +477,7 @@ Gnome-Desktop/
   Makefile
   eslint.config.js
   package.json               lint tooling only, no runtime deps
-  schemas/org.gnome.shell.extensions.desktop-icons-50.gschema.xml
+  schemas/org.gnome.shell.extensions.gnome-desktop-icons.gschema.xml
   src/                       shell process
     helperProcess.js         lifecycle + IPC
     monitorTracker.js        geometry

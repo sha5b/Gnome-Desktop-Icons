@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Shell-wide state the helper needs but cannot observe for itself: it is an
 // ordinary Wayland client and knows nothing about the overview.

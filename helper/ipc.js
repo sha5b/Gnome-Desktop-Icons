@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Helper side of the line-delimited JSON link, over the private Unix socket the
 // extension is listening on. See src/helperProcess.js for why this is not the

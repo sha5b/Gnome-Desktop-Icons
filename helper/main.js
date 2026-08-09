@@ -1,5 +1,6 @@
 #!/usr/bin/env -S gjs -m
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // The GTK4 helper. Runs as an ordinary Wayland client, spawned and supervised
 // by the extension, which passes `--socket <path>` for the IPC link.
@@ -22,9 +23,13 @@ import {NautilusOps} from './nautilusOps.js';
 import {ThumbnailLoader} from './thumbnails.js';
 import {isTrustedLauncher} from './iconView.js';
 
-const APPLICATION_ID = 'com.fiber_elements.DesktopIcons50';
+const APPLICATION_ID = 'io.github.sha5b.GnomeDesktopIcons';
 const HELPER_DIR = Gio.File.new_for_uri(import.meta.url).get_parent();
-const ICON_SIZE = 64;
+
+// Logical pixels. GTK multiplies these by the monitor's scale factor itself, so
+// one set of numbers is right on every display.
+const ICON_SIZES = {small: 48, standard: 64, large: 96};
+const DEFAULT_ICON_SIZE = ICON_SIZES.standard;
 
 class DesktopHelper {
     /**
@@ -35,6 +40,7 @@ class DesktopHelper {
         this._windows = new Map(); // monitor index -> DesktopWindow
         this._ipc = null;
         this._shellState = {overview: false};
+        this._iconSize = DEFAULT_ICON_SIZE;
 
         this._directory = Gio.File.new_for_path(
             GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP) ??
@@ -140,6 +146,9 @@ class DesktopHelper {
         case 'state':
             this._setShellState({overview: message.overview});
             break;
+        case 'settings':
+            this._setSettings(message);
+            break;
         default:
             printerr(`helper: unknown message "${message.type}"`);
             break;
@@ -147,6 +156,7 @@ class DesktopHelper {
     }
 
     _setMonitors(monitors) {
+        this._monitors = monitors;
         const live = new Set();
 
         for (const monitor of monitors) {
@@ -157,7 +167,7 @@ class DesktopHelper {
                 window = new DesktopWindow({
                     application: this._application,
                     monitorIndex: monitor.index,
-                    iconSize: ICON_SIZE,
+                    iconSize: this._iconSize,
                     thumbnails: this._thumbnails,
                     operations: this._operations,
                     onOpen: items => this._open(items),
@@ -182,6 +192,24 @@ class DesktopHelper {
     _setItems(items) {
         for (const window of this._windows.values())
             window.setItems(this._directory, items);
+    }
+
+    _setSettings({iconSize, showHidden}) {
+        this._model.setShowHidden(showHidden);
+
+        const size = ICON_SIZES[iconSize] ?? DEFAULT_ICON_SIZE;
+        if (size === this._iconSize)
+            return;
+
+        // Cell size is derived from the icon size, so the whole grid has to be
+        // rebuilt rather than just re-scaled.
+        this._iconSize = size;
+        for (const window of this._windows.values())
+            window.destroy();
+        this._windows.clear();
+
+        if (this._monitors)
+            this._setMonitors(this._monitors);
     }
 
     _setShellState(state) {

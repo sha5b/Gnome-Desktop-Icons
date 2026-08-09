@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Turns the helper's ordinary Wayland toplevels into desktop windows.
 //
@@ -11,7 +12,7 @@
 // window that the client is not allowed to move.
 //
 // Windows are matched by pid *and* by title: the helper names each toplevel
-// "desktop-icons-50:<monitor index>", which is how a Meta.Window is mapped back
+// "gnome-desktop-icons:<monitor index>", which is how a Meta.Window is mapped back
 // to the monitor it belongs to.
 
 import Meta from 'gi://Meta';
@@ -19,7 +20,7 @@ import Meta from 'gi://Meta';
 import {debug} from './debug.js';
 import * as Compat from './shellCompat.js';
 
-const TITLE_PREFIX = 'desktop-icons-50:';
+const TITLE_PREFIX = 'gnome-desktop-icons:';
 
 export class WindowLayering {
     constructor() {

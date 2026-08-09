@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // The grid of icons on one monitor: layout, selection, input and menus.
 //
 // Icons are placed on a Gtk.Fixed rather than a flow container. The desktop is
-// not a list — a file has a *position*, users drag icons where they want them,
-// and M3 has to restore those positions from the file's
-// metadata::nautilus-icon-position attribute. A layout container would fight
-// that. Until then the slot allocator fills the grid in column order, the way
-// Files does.
+// not a list — a file has a *position*, dragged there by the user and restored
+// from the file's metadata::nautilus-icon-position attribute. A layout
+// container would fight that.
+//
+// Positions snap to a grid. Arranged icons keep their slot; everything else
+// fills the gaps in column order, so dropping a new file into the folder never
+// reshuffles the icons the user has already placed.
 
 import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
@@ -17,7 +20,10 @@ import Gtk from 'gi://Gtk';
 
 import {DesktopIcon} from './desktopIcon.js';
 import {actionAvailability, buildItemMenu} from './itemMenu.js';
+import {addDragSource, addDropTarget} from './dragAndDrop.js';
+import {clearPosition, writePosition} from './iconPositions.js';
 import {openTerminal} from './terminal.js';
+import {pasteFromClipboard, setClipboard} from './clipboard.js';
 
 const CELL_PADDING = 12;
 const EDGE_MARGIN = 16;
@@ -52,8 +58,10 @@ class IconView extends Gtk.Fixed {
      */
     setItems(directory, items) {
         this._directory = directory;
+        this._allItems = items;
 
-        const stillHere = new Set(items.map(item => item.uri));
+        const mine = items.filter(item => this._ownsItem(item));
+        const stillHere = new Set(mine.map(item => item.uri));
         for (const uri of [...this._selection]) {
             if (!stillHere.has(uri))
                 this._selection.delete(uri);
@@ -63,7 +71,7 @@ class IconView extends Gtk.Fixed {
             this.remove(icon);
         this._icons = [];
 
-        for (const item of items) {
+        for (const item of mine) {
             const icon = new DesktopIcon({
                 item,
                 iconSize: this._iconSize,
@@ -82,8 +90,21 @@ class IconView extends Gtk.Fixed {
      * @param {object} monitor - the monitor snapshot this view covers
      */
     setGeometry(monitor) {
-        this._workArea = monitor.workArea;
-        this._layout();
+        this._monitor = monitor;
+        // The snapshot is in global coordinates; this widget's are relative to
+        // its own monitor. Without the shift, everything on a second monitor
+        // would be laid out off the right-hand edge of the world.
+        this._workArea = {
+            x: monitor.workArea.x - monitor.x,
+            y: monitor.workArea.y - monitor.y,
+            width: monitor.workArea.width,
+            height: monitor.workArea.height,
+        };
+
+        if (this._allItems)
+            this.setItems(this._directory, this._allItems);
+        else
+            this._layout();
     }
 
     // --- layout ---
@@ -97,24 +118,118 @@ class IconView extends Gtk.Fixed {
         return this._iconSize + CELL_PADDING * 2 + 40;
     }
 
-    _layout() {
-        if (!this._workArea)
-            return;
+    /**
+     * Which monitor an item belongs to. A saved position names one implicitly,
+     * by falling inside its work area; anything never dragged lives on the
+     * primary monitor.
+     *
+     * @param {object} item - a FileModel item
+     * @returns {boolean} whether this view should draw it
+     */
+    _ownsItem(item) {
+        if (!this._monitor)
+            return false;
 
+        if (!item.position)
+            return this._monitor.primary;
+
+        return this._containsGlobal(item.position.x, item.position.y);
+    }
+
+    _containsGlobal(x, y) {
+        const {workArea} = this._monitor;
+        return x >= workArea.x && x < workArea.x + workArea.width &&
+            y >= workArea.y && y < workArea.y + workArea.height;
+    }
+
+    /** @returns {object} the grid's origin, spacing and extent, monitor-local */
+    _grid() {
         const cellWidth = this._cellWidth();
         const cellHeight = this._cellHeight();
         // The window covers the whole monitor, but icons live inside the work
         // area so they never sit under the top panel or a dock.
-        const originX = this._workArea.x + EDGE_MARGIN;
-        const originY = this._workArea.y + EDGE_MARGIN;
-        const usableHeight = this._workArea.height - EDGE_MARGIN * 2;
-        const rows = Math.max(1, Math.floor(usableHeight / cellHeight));
+        return {
+            cellWidth,
+            cellHeight,
+            originX: this._workArea.x + EDGE_MARGIN,
+            originY: this._workArea.y + EDGE_MARGIN,
+            columns: Math.max(1,
+                Math.floor((this._workArea.width - EDGE_MARGIN * 2) / cellWidth)),
+            rows: Math.max(1,
+                Math.floor((this._workArea.height - EDGE_MARGIN * 2) / cellHeight)),
+        };
+    }
 
-        this._icons.forEach((icon, index) => {
-            const column = Math.floor(index / rows);
-            const row = index % rows;
-            this.move(icon, originX + column * cellWidth, originY + row * cellHeight);
-        });
+    /**
+     * @param {number} x - monitor-local x
+     * @param {number} y - monitor-local y
+     * @returns {object} the {column, row} slot nearest that point
+     */
+    _slotAt(x, y) {
+        const {cellWidth, cellHeight, originX, originY, columns, rows} = this._grid();
+        return {
+            column: clamp(Math.round((x - originX) / cellWidth), 0, columns - 1),
+            row: clamp(Math.round((y - originY) / cellHeight), 0, rows - 1),
+        };
+    }
+
+    /**
+     * @param {object} slot - a grid slot
+     * @param {number} slot.column - its column
+     * @param {number} slot.row - its row
+     * @returns {object} its top-left corner, monitor-local
+     */
+    _slotOrigin({column, row}) {
+        const {cellWidth, cellHeight, originX, originY} = this._grid();
+        return {x: originX + column * cellWidth, y: originY + row * cellHeight};
+    }
+
+    _layout() {
+        if (!this._workArea)
+            return;
+
+        const {rows} = this._grid();
+        const taken = new Set();
+        const placed = new Map();
+
+        // Icons the user has arranged keep their slot. Everything else fills
+        // the gaps in column order, which is how Files lays out a fresh
+        // desktop, so adding a file never reshuffles the arranged ones.
+        for (const icon of this._icons) {
+            const {position} = icon.item;
+            if (!position)
+                continue;
+
+            const slot = this._slotAt(position.x - this._monitor.x, position.y - this._monitor.y);
+            const key = slotKey(slot);
+            if (taken.has(key))
+                continue;
+
+            taken.add(key);
+            placed.set(icon, slot);
+        }
+
+        let next = 0;
+        for (const icon of this._icons) {
+            if (placed.has(icon))
+                continue;
+
+            let slot;
+            let key;
+            do {
+                slot = {column: Math.floor(next / rows), row: next % rows};
+                key = slotKey(slot);
+                next++;
+            } while (taken.has(key));
+
+            taken.add(key);
+            placed.set(icon, slot);
+        }
+
+        for (const [icon, slot] of placed) {
+            const {x, y} = this._slotOrigin(slot);
+            this.move(icon, x, y);
+        }
     }
 
     // --- selection ---
@@ -178,6 +293,192 @@ class IconView extends Gtk.Fixed {
         keys.connect('key-pressed', (_controller, keyval, _code, state) =>
             this._onKeyPressed(keyval, state));
         this.add_controller(keys);
+
+        this._addDragSource();
+
+        addDropTarget(this, {
+            onFiles: (files, x, y, action) => this._onFilesDropped(files, x, y, action),
+            onText: (text, x, y) => this._onTextDropped(text, x, y),
+            onTexture: (texture, x, y) => this._onTextureDropped(texture, x, y),
+            onMotion: (x, y) => this._onDragMotion(x, y),
+            onLeave: () => this._clearDropHighlight(),
+        });
+    }
+
+    // --- drag out ---
+
+    _addDragSource() {
+        addDragSource(this, {
+            onPrepareAt: (x, y) => {
+                const icon = this._iconAt(x, y);
+                if (!icon)
+                    return null;
+
+                // Dragging an unselected icon drags that icon, not the stale
+                // selection behind it.
+                if (!this._selection.has(icon.item.uri))
+                    this._selectOnly(icon.item);
+
+                return {items: this.selectedItems, widget: icon};
+            },
+            onBegin: () => this.add_css_class('dragging'),
+            onEnd: () => this.remove_css_class('dragging'),
+        });
+    }
+
+    // --- drop in ---
+
+    _onDragMotion(x, y) {
+        const icon = this._iconAt(x, y);
+        const target = icon?.item.isDirectory ? icon : null;
+
+        if (this._dropTargetIcon !== target) {
+            this._dropTargetIcon?.remove_css_class('drop-target');
+            target?.add_css_class('drop-target');
+            this._dropTargetIcon = target;
+        }
+
+        return Gdk.DragAction.COPY | Gdk.DragAction.MOVE | Gdk.DragAction.LINK;
+    }
+
+    _clearDropHighlight() {
+        this._dropTargetIcon?.remove_css_class('drop-target');
+        this._dropTargetIcon = null;
+    }
+
+    _onFilesDropped(files, x, y, action) {
+        this._clearDropHighlight();
+        if (files.length === 0)
+            return;
+
+        const uris = files.map(file => file.get_uri());
+        const folder = this._iconAt(x, y);
+        if (folder?.item.isDirectory && !this._isOurs(files[0])) {
+            this._transfer(uris, folder.item.uri, action);
+            return;
+        }
+
+        // Files already on this desktop are being rearranged, not copied.
+        if (files.every(file => this._isOurs(file))) {
+            this._repositionDroppedIcons(files, x, y);
+            return;
+        }
+
+        this._transfer(uris, this._directory.get_uri(), action);
+    }
+
+    _isOurs(file) {
+        const parent = file.get_parent();
+        return parent !== null && parent.equal(this._directory);
+    }
+
+    _transfer(uris, destinationUri, action) {
+        if (action === Gdk.DragAction.MOVE)
+            this._operations.move(uris, destinationUri);
+        else if (action === Gdk.DragAction.LINK)
+            this._linkInto(uris, destinationUri);
+        else
+            this._operations.copy(uris, destinationUri);
+    }
+
+    _linkInto(uris, destinationUri) {
+        // FileOperations2 has no "make a symlink" call, so this one is ours.
+        const destination = Gio.File.new_for_uri(destinationUri);
+        for (const uri of uris) {
+            const source = Gio.File.new_for_uri(uri);
+            const link = destination.get_child(source.get_basename());
+            try {
+                link.make_symbolic_link(source.get_path(), null);
+            } catch (error) {
+                printerr(`iconView: cannot link ${uri}: ${error.message}`);
+            }
+        }
+    }
+
+    /**
+     * Lay the dragged icons out from the drop point, keeping their order, and
+     * remember where each landed.
+     *
+     * @param {Gio.File[]} files - the dropped files
+     * @param {number} x - drop point, monitor-local
+     * @param {number} y - drop point, monitor-local
+     */
+    _repositionDroppedIcons(files, x, y) {
+        const {rows} = this._grid();
+        const dropped = new Set(files.map(file => file.get_uri()));
+        const occupied = new Set();
+
+        for (const icon of this._icons) {
+            if (dropped.has(icon.item.uri))
+                continue;
+            const bounds = icon.compute_bounds(this)[1];
+            if (bounds)
+                occupied.add(slotKey(this._slotAt(bounds.get_x(), bounds.get_y())));
+        }
+
+        const start = this._slotAt(x - this._cellWidth() / 2, y - this._cellHeight() / 2);
+        let offset = 0;
+
+        for (const uri of dropped) {
+            const item = this._icons.find(icon => icon.item.uri === uri)?.item;
+            if (!item)
+                continue;
+
+            let slot;
+            do {
+                const index = start.column * rows + start.row + offset;
+                slot = {column: Math.floor(index / rows), row: index % rows};
+                offset++;
+            } while (occupied.has(slotKey(slot)));
+
+            occupied.add(slotKey(slot));
+            const origin = this._slotOrigin(slot);
+            const position = {
+                x: this._monitor.x + origin.x,
+                y: this._monitor.y + origin.y,
+            };
+
+            // Move the icon now, then persist. A metadata write is not a file
+            // change, so the directory monitor never fires for it — waiting for
+            // the model to come back would mean waiting forever, and the icon
+            // would snap back to where it started.
+            item.position = position;
+            writePosition(item.file, position.x, position.y);
+        }
+
+        this._layout();
+    }
+
+    _onTextDropped(text, x, y) {
+        this._createDroppedFile('Dropped Text.txt',
+            new TextEncoder().encode(text), x, y);
+    }
+
+    _onTextureDropped(texture, x, y) {
+        this._createDroppedFile('Dropped Image.png',
+            texture.save_to_png_bytes().get_data(), x, y);
+    }
+
+    /**
+     * @param {string} baseName - the preferred name
+     * @param {Uint8Array} contents - what to write
+     * @param {number} x - drop point, monitor-local
+     * @param {number} y - drop point, monitor-local
+     */
+    _createDroppedFile(baseName, contents, x, y) {
+        this._clearDropHighlight();
+
+        const file = this._directory.get_child(uniqueName(this._directory, baseName));
+        try {
+            file.replace_contents(contents, null, false,
+                Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+        } catch (error) {
+            printerr(`iconView: cannot write ${file.get_basename()}: ${error.message}`);
+            return;
+        }
+
+        const origin = this._slotOrigin(this._slotAt(x, y));
+        writePosition(file, this._monitor.x + origin.x, this._monitor.y + origin.y);
     }
 
     _onPrimaryPressed(gesture, nPress, x, y) {
@@ -228,6 +529,26 @@ class IconView extends Gtk.Fixed {
             if (!control)
                 return Gdk.EVENT_PROPAGATE;
             this._selectAll();
+            return Gdk.EVENT_STOP;
+        case Gdk.KEY_x:
+            if (!control)
+                return Gdk.EVENT_PROPAGATE;
+            this._toClipboard('cut');
+            return Gdk.EVENT_STOP;
+        case Gdk.KEY_c:
+            if (!control)
+                return Gdk.EVENT_PROPAGATE;
+            this._toClipboard('copy');
+            return Gdk.EVENT_STOP;
+        case Gdk.KEY_v:
+            if (!control)
+                return Gdk.EVENT_PROPAGATE;
+            this._paste();
+            return Gdk.EVENT_STOP;
+        case Gdk.KEY_z:
+            if (!control)
+                return Gdk.EVENT_PROPAGATE;
+            this._operations.undo();
             return Gdk.EVENT_STOP;
         case Gdk.KEY_Return:
         case Gdk.KEY_KP_Enter:
@@ -289,15 +610,21 @@ class IconView extends Gtk.Fixed {
         create.append('New Folder', 'desktop.new-folder');
         background.append_section(null, create);
 
+        // Five entries, and each one is the only way to reach what it does.
+        // Dropped: Select All and Undo (Ctrl+A, Ctrl+Z), Open Desktop in Files
+        // (the desktop already is that folder), and Display Settings (nothing
+        // to do with the desktop).
+        const edit = new Gio.Menu();
+        edit.append('Paste', 'desktop.paste');
+        background.append_section(null, edit);
+
         const open = new Gio.Menu();
         open.append('Open in Terminal', 'desktop.open-terminal-here');
-        open.append('Open Desktop in Files', 'desktop.open-desktop');
-        open.append('Select All', 'desktop.select-all');
+        open.append('Tidy Up Icons', 'desktop.tidy-up');
         background.append_section(null, open);
 
         const settings = new Gio.Menu();
         settings.append('Change Background…', 'desktop.change-background');
-        settings.append('Display Settings', 'desktop.display-settings');
         background.append_section(null, settings);
 
         this._menu = new Gtk.PopoverMenu({has_arrow: false, halign: Gtk.Align.START});
@@ -329,6 +656,11 @@ class IconView extends Gtk.Fixed {
             'open': () => this._onOpen(this.selectedItems),
             'open-with': () => this._openWith(),
             'open-terminal': () => this._openTerminalInSelection(),
+            'cut': () => this._toClipboard('cut'),
+            'copy': () => this._toClipboard('copy'),
+            'paste': () => this._paste(),
+            'undo': () => this._operations.undo(),
+            'tidy-up': () => this._tidyUp(),
             'set-background': () => this._setBackground(),
             'allow-launching': () => this._allowLaunching(),
             'show-in-files': () => this._operations.showItems(this._selectedUris()),
@@ -341,6 +673,37 @@ class IconView extends Gtk.Fixed {
             'change-background': () => launchSettings('background'),
             'display-settings': () => launchSettings('display'),
         };
+    }
+
+    _toClipboard(intent) {
+        const items = this.selectedItems;
+        if (items.length > 0)
+            setClipboard(this.get_display().get_clipboard(), items, intent);
+    }
+
+    _paste() {
+        pasteFromClipboard(this.get_display().get_clipboard(), (uris, intent) => {
+            // Pasting into the folder they already live in would be a no-op at
+            // best and a "copy 2" storm at worst.
+            const incoming = uris.filter(uri => !this._isOurs(Gio.File.new_for_uri(uri)));
+            if (incoming.length === 0)
+                return;
+
+            if (intent === 'cut')
+                this._operations.move(incoming, this._directory.get_uri());
+            else
+                this._operations.copy(incoming, this._directory.get_uri());
+        });
+    }
+
+    /** Forget every saved position, so the grid re-flows in sort order. */
+    _tidyUp() {
+        for (const icon of this._icons) {
+            icon.item.position = null;
+            clearPosition(icon.item.file);
+        }
+
+        this._layout();
     }
 
     _openTerminalInSelection() {
@@ -404,6 +767,26 @@ class IconView extends Gtk.Fixed {
         dialog.launch(this.get_root(), null, null);
     }
 });
+
+/**
+ * @param {number} value - the number to bound
+ * @param {number} low - lowest allowed
+ * @param {number} high - highest allowed
+ * @returns {number} value, brought inside [low, high]
+ */
+function clamp(value, low, high) {
+    return Math.min(high, Math.max(low, value));
+}
+
+/**
+ * @param {object} slot - a grid slot
+ * @param {number} slot.column - its column
+ * @param {number} slot.row - its row
+ * @returns {string} a key for Set membership
+ */
+function slotKey({column, row}) {
+    return `${column},${row}`;
+}
 
 /**
  * @param {Gio.File} directory - where the new item goes

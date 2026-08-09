@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Flat config based on the rules the GNOME Shell tree enforces on extensions.
 // Install the tooling first: npm install
@@ -18,6 +19,9 @@ const gjsGlobals = {
     print: 'readonly',
     printerr: 'readonly',
     pkg: 'readonly',
+    // GJS provides the WHATWG encoding API in place of the removed ByteArray.
+    TextDecoder: 'readonly',
+    TextEncoder: 'readonly',
 };
 
 export default [

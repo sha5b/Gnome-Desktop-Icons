@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Builds the item context menu for whatever is actually selected.
 //
@@ -32,11 +33,15 @@ export function buildItemMenu(items) {
     if (specific.get_n_items() > 0)
         menu.append_section(null, specific);
 
-    const manage = new Gio.Menu();
-    manage.append('Show in Files', 'desktop.show-in-files');
-    manage.append(items.length > 1 ? `Move ${items.length} Items to Trash` : 'Move to Trash',
+    // Cut and Copy earn their place even though Ctrl+X and Ctrl+C exist: Paste
+    // lives in the background menu, and a paste with no discoverable copy is a
+    // dead end. "Show in Files" does not — the desktop already *is* that folder.
+    const edit = new Gio.Menu();
+    edit.append('Cut', 'desktop.cut');
+    edit.append('Copy', 'desktop.copy');
+    edit.append(items.length > 1 ? `Move ${items.length} Items to Trash` : 'Move to Trash',
         'desktop.trash');
-    menu.append_section(null, manage);
+    menu.append_section(null, edit);
 
     const info = new Gio.Menu();
     info.append('Properties', 'desktop.properties');
@@ -64,7 +69,7 @@ function openSection(items, single) {
         section.append('Open', 'desktop.open');
 
     if (single)
-        section.append('Open With Other Application…', 'desktop.open-with');
+        section.append('Open With…', 'desktop.open-with');
 
     return section;
 }
@@ -122,6 +127,8 @@ export function actionAvailability(items) {
             single.contentType === 'application/x-desktop' && !single.isExecutable),
         'open-with': Boolean(single),
         'open': items.length > 0,
+        'cut': items.length > 0,
+        'copy': items.length > 0,
         'show-in-files': items.length > 0,
         'trash': items.length > 0,
         'properties': items.length > 0,

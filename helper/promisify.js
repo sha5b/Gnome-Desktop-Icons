@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // GJS does not turn async GIO methods into promises on its own, so every one we
 // await is registered here. Import this module for its side effect from any

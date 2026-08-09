@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // What is on the desktop. Enumerates ~/Desktop asynchronously and re-reads it
 // when anything changes.
@@ -12,6 +13,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import './promisify.js';
+import {readPosition} from './iconPositions.js';
 
 const ATTRIBUTES = [
     'standard::name',
@@ -27,6 +29,7 @@ const ATTRIBUTES = [
     'access::can-execute',
     'access::can-write',
     'time::modified',
+    'metadata::nautilus-icon-position',
 ].join(',');
 
 // File monitors report a burst of events for one logical change (write, then
@@ -146,6 +149,8 @@ export class FileModel {
             modified: info.get_attribute_uint64('time::modified'),
             thumbnailPath: info.get_attribute_boolean('thumbnail::is-valid')
                 ? thumbnail : null,
+            // null until the user drags the icon somewhere.
+            position: readPosition(info),
         };
     }
 }

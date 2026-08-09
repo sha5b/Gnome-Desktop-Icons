@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
+/* Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com> */
 
 /* The shell paints the wallpaper below us; draw nothing of our own. */
 window.desktop-window,
@@ -51,4 +52,18 @@ window.desktop-window,
 
 .desktop-icon.is-symlink .desktop-icon-label {
   font-style: italic;
+}
+
+/* A folder that will receive what is being dragged. Distinct from selection,
+   because a drop target is usually not the selected thing. */
+.desktop-icon.drop-target {
+  background-color: alpha(@accent_bg_color, 0.35);
+  outline: 2px dashed @accent_bg_color;
+  outline-offset: -2px;
+}
+
+/* Fade the icons being dragged, so the drag image is clearly the thing that
+   moved and the originals read as "in flight". */
+.icon-view.dragging .desktop-icon.selected {
+  opacity: 0.4;
 }

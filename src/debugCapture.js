@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Screenshots a nested shell from the inside.
 //
@@ -7,7 +8,7 @@
 // UI, so there is no way to look at the result from outside. This writes the
 // stage to a file instead. Constructed only when the environment asks for it:
 //
-//   DESKTOP_ICONS_50_DEBUG_SHOT=/tmp/desktop.png gnome-shell --devkit --wayland
+//   GNOME_DESKTOP_ICONS_DEBUG_SHOT=/tmp/desktop.png gnome-shell --devkit --wayland
 //
 // Never active in an installed extension.
 
@@ -23,18 +24,23 @@ import {debug} from './debug.js';
 const OPEN_DELAY_SECONDS = 10;
 // Time for an animation — the overview closing, a menu opening — to finish.
 const SETTLE_SECONDS = 2;
+// A synthesised drag: enough steps and enough time between them that GTK sees
+// motion rather than a teleport.
+const DRAG_STEPS = 20;
+const DRAG_STEP_MILLISECONDS = 40;
+const DRAG_SECONDS = 2;
 
 /**
  * An optional click to perform before the shutter, as "x,y" or "x,y,button".
  * There is no other way to reach a nested shell: it has no session bus a test
  * script can drive, and the pointer belongs to the outer compositor.
  *
- *   DESKTOP_ICONS_50_DEBUG_CLICK=72,216,3   right-click that spot, then shoot
+ *   GNOME_DESKTOP_ICONS_DEBUG_CLICK=72,216,3   right-click that spot, then shoot
  *
  * @returns {?object} the parsed click, or null if none was asked for
  */
 function clickSpec() {
-    const raw = GLib.getenv('DESKTOP_ICONS_50_DEBUG_CLICK');
+    const raw = GLib.getenv('GNOME_DESKTOP_ICONS_DEBUG_CLICK');
     if (!raw)
         return null;
 
@@ -45,9 +51,28 @@ function clickSpec() {
     return {x, y, button: Number.isInteger(button) ? button : Clutter.BUTTON_PRIMARY};
 }
 
+/**
+ * An optional drag to perform before the shutter, as "x1,y1,x2,y2".
+ *
+ *   GNOME_DESKTOP_ICONS_DEBUG_DRAG=72,220,700,600
+ *
+ * @returns {?object} the parsed drag, or null if none was asked for
+ */
+function dragSpec() {
+    const raw = GLib.getenv('GNOME_DESKTOP_ICONS_DEBUG_DRAG');
+    if (!raw)
+        return null;
+
+    const [x1, y1, x2, y2] = raw.split(',').map(part => Number.parseInt(part, 10));
+    if (![x1, y1, x2, y2].every(Number.isInteger))
+        return null;
+
+    return {x1, y1, x2, y2};
+}
+
 /** @returns {?string} the file to write to, if capture was asked for */
 export function capturePath() {
-    return GLib.getenv('DESKTOP_ICONS_50_DEBUG_SHOT');
+    return GLib.getenv('GNOME_DESKTOP_ICONS_DEBUG_SHOT');
 }
 
 export class DebugCapture {
@@ -64,11 +89,18 @@ export class DebugCapture {
         // screenshot is a picture of the overview.
         this._defer(OPEN_DELAY_SECONDS, () => Compat.hideOverview());
 
-        const click = clickSpec();
         let shutter = OPEN_DELAY_SECONDS + SETTLE_SECONDS;
+
+        const click = clickSpec();
         if (click) {
             this._defer(shutter, () => this._click(click));
             shutter += SETTLE_SECONDS;
+        }
+
+        const drag = dragSpec();
+        if (drag) {
+            this._defer(shutter, () => this._drag(drag));
+            shutter += DRAG_SECONDS + SETTLE_SECONDS;
         }
 
         this._defer(shutter, () => this._capture());
@@ -103,6 +135,47 @@ export class DebugCapture {
                 button, Clutter.ButtonState.RELEASED);
             debug(`clicked button ${button} at ${x},${y}`);
         });
+    }
+
+    /**
+     * Press, move in steps, release. The steps matter: GTK only starts a drag
+     * after the pointer has travelled past its threshold, and it needs real
+     * motion events spread over more than one frame to notice.
+     *
+     * @param {object} params - the drag
+     * @param {number} params.x1 - where to press
+     * @param {number} params.y1 - where to press
+     * @param {number} params.x2 - where to release
+     * @param {number} params.y2 - where to release
+     */
+    _drag({x1, y1, x2, y2}) {
+        const seat = Clutter.get_default_backend().get_default_seat();
+        this._pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+
+        // Warp first, press a turn later. A press delivered in the same frame
+        // as the motion that created the pointer focus is not routed to the
+        // surface the pointer just arrived on.
+        seat.warp_pointer(x1, y1);
+        GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, DRAG_STEP_MILLISECONDS, () => {
+            this._pointer.notify_button(GLib.get_monotonic_time(),
+                Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+        });
+
+        for (let step = 1; step <= DRAG_STEPS; step++) {
+            const progress = step / DRAG_STEPS;
+            GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
+                (step + 1) * DRAG_STEP_MILLISECONDS, () => {
+                    seat.warp_pointer(
+                        Math.round(x1 + (x2 - x1) * progress),
+                        Math.round(y1 + (y2 - y1) * progress));
+
+                    if (step === DRAG_STEPS) {
+                        this._pointer.notify_button(GLib.get_monotonic_time(),
+                            Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+                        debug(`dragged ${x1},${y1} to ${x2},${y2}`);
+                    }
+                });
+        }
     }
 
     _capture() {

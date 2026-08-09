@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // One transparent toplevel per monitor, holding that monitor's icon grid.
 //
@@ -15,7 +16,7 @@ import Gtk from 'gi://Gtk';
 
 import {IconView} from './iconView.js';
 
-const TITLE_PREFIX = 'desktop-icons-50:';
+const TITLE_PREFIX = 'gnome-desktop-icons:';
 
 export const DesktopWindow = GObject.registerClass(
 class DesktopWindow extends Gtk.ApplicationWindow {

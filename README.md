@@ -1,4 +1,4 @@
-# Desktop Icons 50
+# Gnome Desktop Icons
 
 File icons on the desktop for GNOME Shell 50, with the file operations handed to
 Nautilus.
@@ -23,7 +23,13 @@ and it undoes what you just did on the desktop.
 - A context menu that changes with what you click: the first entry names the
   application that will open the file, folders offer a terminal, pictures offer
   to become the wallpaper, and an untrusted launcher offers to be trusted
+- Drag icons where you want them; positions are remembered per file, and per
+  monitor. Drag files out to any application, and drop files, text or images in
+- Cut, copy and paste that interoperates with Files, sharing its undo stack
 - Selection with click, Ctrl-click and Ctrl+A; arrow keys, Enter and Delete
+
+The menus are deliberately short. Nothing appears in them that a keyboard
+shortcut already covers, and nothing appears twice.
 
 ## Requirements
 
@@ -45,7 +51,7 @@ at startup, so a newly installed extension cannot be loaded into the session you
 are already in.
 
 ```bash
-gnome-extensions enable desktop-icons-50@fiber-elements.com
+gnome-extensions enable gnome-desktop-icons@ned.tabulov.gmail.com
 ```
 
 ## How it is built
@@ -87,7 +93,7 @@ sudo dnf install mutter-devkit          # --devkit is the only nested mode on Sh
 
 export DBUS_SESSION_BUS_ADDRESS=$(dbus-daemon --session --fork --print-address)
 XDG_CONFIG_HOME=/tmp/di/config GSETTINGS_BACKEND=keyfile \
-  DESKTOP_ICONS_50_DEBUG=1 \
+  GNOME_DESKTOP_ICONS_DEBUG=1 \
   gnome-shell --devkit --wayland --wayland-display=probe-wl
 ```
 
@@ -99,9 +105,9 @@ Three environment variables help, all silent unless set:
 
 | Variable | Effect |
 |---|---|
-| `DESKTOP_ICONS_50_DEBUG=1` | trace lifecycle, geometry and layering to the journal |
-| `DESKTOP_ICONS_50_DEBUG_SHOT=<path>` | close the overview and write a screenshot of the stage |
-| `DESKTOP_ICONS_50_DEBUG_CLICK=x,y[,button]` | click that spot first — the only way to drive a nested shell |
+| `GNOME_DESKTOP_ICONS_DEBUG=1` | trace lifecycle, geometry and layering to the journal |
+| `GNOME_DESKTOP_ICONS_DEBUG_SHOT=<path>` | close the overview and write a screenshot of the stage |
+| `GNOME_DESKTOP_ICONS_DEBUG_CLICK=x,y[,button]` | click that spot first — the only way to drive a nested shell |
 
 ```bash
 make check     # parse every source file as an ES module
@@ -121,11 +127,15 @@ sudo sysctl -w fs.inotify.max_user_instances=1024
 
 ## Status
 
-Working: the grid, icons, thumbnails, selection, keyboard, context menus, and the
-Nautilus operations.
+Working: the grid, icons, thumbnails, selection, keyboard, context menus, the
+Nautilus operations, drag-and-drop, clipboard, and saved icon positions.
 
-Not yet: drag-and-drop, inline rename, cut/copy/paste, saved icon positions, the
-Home and Trash desktop items, and a preferences window. See `PLAN.md`.
+Not yet: inline rename, rubber-band selection, the Home and Trash desktop items,
+mounted volumes, and a preferences window. See `PLAN.md`.
+
+## Author
+
+Shahab Nedaei <ned.tabulov@gmail.com>
 
 ## License
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
 // Entry point. Everything here is lifecycle: build four objects in enable(),
 // tear the same four down in disable(). All real work happens in src/ and in
@@ -17,6 +18,10 @@ import {WindowLayering} from './src/windowLayering.js';
 
 export default class DesktopIconsExtension extends Extension {
     enable() {
+        this._settings = this.getSettings();
+        this._settingsId = this._settings.connect('changed',
+            () => this._publishSettings());
+
         this._layering = new WindowLayering();
         this._monitors = new MonitorTracker(() => this._publishMonitors());
         this._state = new ShellState(() => this._publishState());
@@ -37,6 +42,10 @@ export default class DesktopIconsExtension extends Extension {
     disable() {
         this._capture?.destroy();
         this._capture = null;
+
+        this._settings.disconnect(this._settingsId);
+        this._settingsId = 0;
+        this._settings = null;
 
         this._helper.stop();
         this._helper = null;
@@ -65,19 +74,28 @@ export default class DesktopIconsExtension extends Extension {
         this._helper.send({type: 'state', ...this._state.snapshot()});
     }
 
+    _publishSettings() {
+        this._helper.send({
+            type: 'settings',
+            iconSize: this._settings.get_string('icon-size'),
+            showHidden: this._settings.get_boolean('show-hidden'),
+        });
+    }
+
     _onHelperMessage(message) {
         switch (message.type) {
         case 'ready':
             // The helper has just started, or just restarted after a crash, and
             // knows nothing yet. Send it everything.
+            this._publishSettings();
             this._publishMonitors();
             this._publishState();
             break;
         case 'log':
-            console.log(`desktop-icons-50 helper: ${message.text}`);
+            console.log(`gnome-desktop-icons helper: ${message.text}`);
             break;
         default:
-            console.warn(`desktop-icons-50: unknown message "${message.type}"`);
+            console.warn(`gnome-desktop-icons: unknown message "${message.type}"`);
             break;
         }
     }
