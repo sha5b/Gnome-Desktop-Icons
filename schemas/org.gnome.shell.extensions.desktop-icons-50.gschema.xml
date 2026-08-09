@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <enum id="org.gnome.shell.extensions.desktop-icons-50.IconSize">
+    <value nick="small" value="0"/>
+    <value nick="standard" value="1"/>
+    <value nick="large" value="2"/>
+  </enum>
+
+  <schema id="org.gnome.shell.extensions.desktop-icons-50"
+          path="/org/gnome/shell/extensions/desktop-icons-50/">
+    <key name="icon-size" enum="org.gnome.shell.extensions.desktop-icons-50.IconSize">
+      <default>'standard'</default>
+      <summary>Icon size</summary>
+      <description>Size of the icons drawn on the desktop.</description>
+    </key>
+    <key name="show-hidden" type="b">
+      <default>false</default>
+      <summary>Show hidden files</summary>
+      <description>Draw files whose name starts with a dot.</description>
+    </key>
+  </schema>
+</schemalist>

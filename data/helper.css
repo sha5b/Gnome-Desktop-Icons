@@ -1,0 +1,54 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
+/* The shell paints the wallpaper below us; draw nothing of our own. */
+window.desktop-window,
+.icon-view {
+  background-color: transparent;
+}
+
+.desktop-icon {
+  padding: 6px;
+  border-radius: 10px;
+  /* A wallpaper can be any colour, so the label needs its own contrast rather
+     than relying on the theme's foreground being readable against it. */
+  color: #ffffff;
+}
+
+.desktop-icon:hover {
+  background-color: alpha(#ffffff, 0.12);
+}
+
+.desktop-icon.selected {
+  background-color: alpha(@accent_bg_color, 0.55);
+  outline: 1px solid alpha(#ffffff, 0.35);
+  outline-offset: -1px;
+}
+
+.desktop-icon-label {
+  font-size: 0.9em;
+  /* The one thing that makes white text legible on a light wallpaper. */
+  text-shadow: 0 1px 3px alpha(#000000, 0.85);
+}
+
+.desktop-icon.selected .desktop-icon-label {
+  text-shadow: none;
+}
+
+/* Generic MIME icons carry their own silhouette, so they only need a drop
+   shadow. Thumbnails are photographs of arbitrary brightness and need a frame
+   to separate them from the wallpaper. */
+.desktop-icon-image {
+  -gtk-icon-shadow: 0 1px 4px alpha(#000000, 0.5);
+}
+
+.desktop-icon-image.has-thumbnail {
+  background-color: alpha(#000000, 0.25);
+  border: 1px solid alpha(#ffffff, 0.25);
+  border-radius: 4px;
+  padding: 2px;
+  -gtk-icon-shadow: none;
+}
+
+.desktop-icon.is-symlink .desktop-icon-label {
+  font-style: italic;
+}

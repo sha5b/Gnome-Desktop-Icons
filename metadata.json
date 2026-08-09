@@ -1,0 +1,9 @@
+{
+  "uuid": "desktop-icons-50@fiber-elements.com",
+  "name": "Desktop Icons 50",
+  "description": "Draws file icons on the desktop. Rendering, drag-and-drop and menus run in a separate GTK4 helper process; file operations are delegated to Nautilus.",
+  "shell-version": ["50"],
+  "url": "https://github.com/sha5b/Gnome-Desktop-Icons",
+  "settings-schema": "org.gnome.shell.extensions.desktop-icons-50",
+  "version-name": "0.1.0"
+}
