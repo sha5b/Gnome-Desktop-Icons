@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Gnome Desktop Icons\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-09 20:10+0200\n"
+"POT-Creation-Date: 2026-08-09 20:36+0200\n"
 "PO-Revision-Date: 2026-08-09 19:35+0200\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -17,97 +17,115 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: prefs.js:19
+#: prefs.js:28
 msgid "File Type"
 msgstr "Dateityp"
 
-#: prefs.js:20
+#: prefs.js:29
 msgid "Opening Application"
 msgstr "Öffnende Anwendung"
 
-#: prefs.js:24
+#: prefs.js:33
 msgid "Small"
 msgstr "Klein"
 
-#: prefs.js:25
+#: prefs.js:34
 msgid "Standard"
 msgstr "Standard"
 
-#: prefs.js:26
+#: prefs.js:35
 msgid "Large"
 msgstr "Groß"
 
-#: prefs.js:37
+#: prefs.js:39
 msgid "Desktop"
 msgstr "Schreibtisch"
 
-#: prefs.js:42
+#: prefs.js:44
 msgid "Icons"
 msgstr "Symbole"
 
-#: prefs.js:43
+#: prefs.js:45
 msgid ""
 "Click behaviour follows Files, so the desktop and file windows always agree."
 msgstr ""
 "Das Klickverhalten richtet sich nach »Dateien«, damit Schreibtisch und "
 "Dateifenster übereinstimmen."
 
-#: prefs.js:47
+#: prefs.js:49
 msgid "Icon Size"
 msgstr "Symbolgröße"
 
-#: prefs.js:56
+#: prefs.js:58
 msgid "Icon Shows"
 msgstr "Symbol zeigt"
 
-#: prefs.js:57
+#: prefs.js:59
 msgid ""
 "“File Type” tells a .stl from a .obj. “Opening Application” changes the icon "
 "when you change the default program. A thumbnail wins over both."
 msgstr ""
 "„Dateityp“ unterscheidet eine .stl von einer .obj. „Öffnende Anwendung“ "
-"ändert das Symbol, wenn Sie das Standardprogramm wechseln. Ein "
-"Vorschaubild hat immer Vorrang."
+"ändert das Symbol, wenn Sie das Standardprogramm wechseln. Ein Vorschaubild "
+"hat immer Vorrang."
 
-#: prefs.js:69
+#: prefs.js:70
 msgid "Show Hidden Files"
 msgstr "Verborgene Dateien anzeigen"
 
-#: prefs.js:70
+#: prefs.js:71
 msgid "Files whose name begins with a dot"
 msgstr "Dateien, deren Name mit einem Punkt beginnt"
 
-#: prefs.js:79
+#: prefs.js:80
 msgid "Show on the Desktop"
 msgstr "Auf dem Schreibtisch anzeigen"
 
-#: prefs.js:80
+#: prefs.js:81
 msgid "Places that are not files in the Desktop folder."
 msgstr "Orte, die keine Dateien im Schreibtisch-Ordner sind."
 
-#: prefs.js:84 helper/specialItems.js:81
+#: prefs.js:85 helper/specialItems.js:81
 msgid "Home"
 msgstr "Persönlicher Ordner"
 
-#: prefs.js:84
+#: prefs.js:85
 msgid "Your home folder"
 msgstr "Ihr persönlicher Ordner"
 
-#: prefs.js:85 helper/specialItems.js:91
+#: prefs.js:86 helper/specialItems.js:91
 msgid "Wastebasket"
 msgstr "Papierkorb"
 
-#: prefs.js:85
+#: prefs.js:86
 msgid "Shows whether it is empty or full"
 msgstr "Zeigt an, ob er leer oder voll ist"
 
-#: prefs.js:86
+#: prefs.js:87
 msgid "Mounted Drives"
 msgstr "Eingehängte Laufwerke"
 
-#: prefs.js:86
+#: prefs.js:87
 msgid "USB sticks, discs and other mounts"
 msgstr "USB-Sticks, Datenträger und andere Einhängepunkte"
+
+#: helper/desktopIcon.js:124
+msgid "folder"
+msgstr "Ordner"
+
+#: helper/desktopIcon.js:124
+msgid "file"
+msgstr "Datei"
+
+#: helper/desktopIcon.js:126
+#, javascript-format
+msgid "%s, link to a %s"
+msgstr "%s, Verknüpfung zu %s"
+
+#: helper/desktopIcon.js:127
+#, javascript-format
+msgid "%s, %s"
+msgstr "%s, %s"
 
 #: helper/iconView.js:549
 msgid "Dropped Text.txt"
@@ -251,6 +269,11 @@ msgstr "Legt die Vorgabe fest und ändert, was ein Doppelklick bewirkt"
 #: helper/renamePopover.js:46
 msgid "Rename"
 msgstr "Umbenennen"
+
+#: helper/terminal.js:97
+#, javascript-format
+msgid "[exited with %s — press Enter to close]"
+msgstr "[mit %s beendet — zum Schließen die Eingabetaste drücken]"
 
 #~ msgid "Run as Administrator"
 #~ msgstr "Als Administrator ausführen"
