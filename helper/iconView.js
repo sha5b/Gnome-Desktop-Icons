@@ -19,14 +19,18 @@ import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
 
 import {DesktopIcon} from './desktopIcon.js';
-import {actionAvailability, buildItemMenu} from './itemMenu.js';
+import {actionAvailability, buildItemMenu, defaultApplicationId} from './itemMenu.js';
 import {addDragSource, addDropTarget} from './dragAndDrop.js';
 import {clearPosition, writePosition} from './iconPositions.js';
+import {ClickPolicy} from './clickPolicy.js';
+import {RenamePopover} from './renamePopover.js';
 import {openTerminal} from './terminal.js';
 import {pasteFromClipboard, setClipboard} from './clipboard.js';
 
 const CELL_PADDING = 12;
 const EDGE_MARGIN = 16;
+// How long a type-ahead search stays open after the last keystroke.
+const TYPE_AHEAD_MILLISECONDS = 1000;
 
 export const IconView = GObject.registerClass(
 class IconView extends Gtk.Fixed {
@@ -44,6 +48,14 @@ class IconView extends Gtk.Fixed {
         this._selection = new Set();
         this._workArea = null;
         this._directory = null;
+        this._typeAhead = '';
+        this._typeAheadId = 0;
+
+        this._clickPolicy = new ClickPolicy(() => {});
+        this._rename = new RenamePopover({
+            onCommit: (item, name) => this._operations.rename(item.uri, name),
+        });
+        this._rename.set_parent(this);
 
         this.add_css_class('icon-view');
         this.set_focusable(true);
@@ -329,6 +341,8 @@ class IconView extends Gtk.Fixed {
     // --- drop in ---
 
     _onDragMotion(x, y) {
+        // Highlight only; the action GTK is told about is decided in
+        // dragAndDrop.js, which has the Gdk.Drop and its modifiers to hand.
         const icon = this._iconAt(x, y);
         const target = icon?.item.isDirectory ? icon : null;
 
@@ -337,8 +351,6 @@ class IconView extends Gtk.Fixed {
             target?.add_css_class('drop-target');
             this._dropTargetIcon = target;
         }
-
-        return Gdk.DragAction.COPY | Gdk.DragAction.MOVE | Gdk.DragAction.LINK;
     }
 
     _clearDropHighlight() {
@@ -502,7 +514,8 @@ class IconView extends Gtk.Fixed {
         if (!this._selection.has(icon.item.uri))
             this._selectOnly(icon.item);
 
-        if (nPress === 2)
+        const opensAt = this._clickPolicy.singleClick ? 1 : 2;
+        if (nPress === opensAt)
             this._onOpen([icon.item]);
     }
 
@@ -558,6 +571,9 @@ class IconView extends Gtk.Fixed {
         case Gdk.KEY_KP_Delete:
             this._trashSelection();
             return Gdk.EVENT_STOP;
+        case Gdk.KEY_F2:
+            this._renameSelection();
+            return Gdk.EVENT_STOP;
         case Gdk.KEY_Escape:
             this._selectOnly(null);
             return Gdk.EVENT_STOP;
@@ -568,8 +584,47 @@ class IconView extends Gtk.Fixed {
             this._moveSelection(keyval);
             return Gdk.EVENT_STOP;
         default:
-            return Gdk.EVENT_PROPAGATE;
+            return control ? Gdk.EVENT_PROPAGATE : this._typeAheadKey(keyval);
         }
+    }
+
+    /**
+     * Jump to the first item whose name starts with what has been typed, the
+     * way every file list does. Keystrokes accumulate until a pause.
+     *
+     * @param {number} keyval - the key pressed
+     * @returns {boolean} whether the key was consumed
+     */
+    _typeAheadKey(keyval) {
+        const unichar = Gdk.keyval_to_unicode(keyval);
+        if (unichar === 0)
+            return Gdk.EVENT_PROPAGATE;
+
+        const character = String.fromCharCode(unichar);
+        if (character.trim() === '' && character !== ' ')
+            return Gdk.EVENT_PROPAGATE;
+
+        this._typeAhead += character;
+        this._restartTypeAheadTimer();
+
+        const prefix = this._typeAhead.toLowerCase();
+        const match = this._icons.find(icon =>
+            icon.item.displayName.toLowerCase().startsWith(prefix));
+        if (match)
+            this._selectOnly(match.item);
+
+        return Gdk.EVENT_STOP;
+    }
+
+    _restartTypeAheadTimer() {
+        if (this._typeAheadId)
+            GLib.Source.remove(this._typeAheadId);
+
+        this._typeAheadId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
+            TYPE_AHEAD_MILLISECONDS, () => {
+                this._typeAheadId = 0;
+                this._typeAhead = '';
+            });
     }
 
     _moveSelection(keyval) {
@@ -600,6 +655,14 @@ class IconView extends Gtk.Fixed {
             action.connect('activate', activate);
             this._actions.add_action(action);
         }
+        // Stateful: its value is the id of the current default application, so
+        // the Open With list can show a radio dot on the right entry.
+        this._defaultApp = Gio.SimpleAction.new_stateful('default-app',
+            GLib.VariantType.new('s'), GLib.Variant.new_string(''));
+        this._defaultApp.connect('activate',
+            (_action, parameter) => this._openWithApplication(parameter.deepUnpack()));
+        this._actions.add_action(this._defaultApp);
+
         this.insert_action_group('desktop', this._actions);
 
         // The background menu is the same whatever is under the pointer, so it
@@ -634,6 +697,9 @@ class IconView extends Gtk.Fixed {
 
     _popupItemMenu(x, y) {
         const items = this.selectedItems;
+        if (items.length === 1)
+            this._defaultApp.set_state(GLib.Variant.new_string(defaultApplicationId(items[0])));
+
         const available = actionAvailability(items);
         for (const [name, enabled] of Object.entries(available))
             this._actions.lookup_action(name)?.set_enabled(enabled);
@@ -656,6 +722,7 @@ class IconView extends Gtk.Fixed {
             'open': () => this._onOpen(this.selectedItems),
             'open-with': () => this._openWith(),
             'open-terminal': () => this._openTerminalInSelection(),
+            'rename': () => this._renameSelection(),
             'cut': () => this._toClipboard('cut'),
             'copy': () => this._toClipboard('copy'),
             'paste': () => this._paste(),
@@ -663,16 +730,31 @@ class IconView extends Gtk.Fixed {
             'tidy-up': () => this._tidyUp(),
             'set-background': () => this._setBackground(),
             'allow-launching': () => this._allowLaunching(),
-            'show-in-files': () => this._operations.showItems(this._selectedUris()),
             'properties': () => this._operations.showProperties(this._selectedUris()),
             'trash': () => this._trashSelection(),
             'select-all': () => this._selectAll(),
             'new-folder': () => this._newFolder(),
             'open-terminal-here': () => openTerminal(this._directory),
-            'open-desktop': () => launchUri(this._directory.get_uri()),
             'change-background': () => launchSettings('background'),
-            'display-settings': () => launchSettings('display'),
         };
+    }
+
+    _renameSelection() {
+        const [item] = this.selectedItems;
+        if (!item)
+            return;
+
+        const icon = this._icons.find(candidate => candidate.item.uri === item.uri);
+        const bounds = icon?.compute_bounds(this)[1];
+        if (!bounds)
+            return;
+
+        this._rename.open(item, new Gdk.Rectangle({
+            x: bounds.get_x(),
+            y: bounds.get_y(),
+            width: bounds.get_width(),
+            height: bounds.get_height(),
+        }));
     }
 
     _toClipboard(intent) {
@@ -755,6 +837,38 @@ class IconView extends Gtk.Fixed {
             uniqueName(this._directory, 'Untitled Folder'));
     }
 
+    /**
+     * Make the chosen application the default for this type, then open with it.
+     *
+     * @param {string} applicationId - a desktop file id
+     */
+    _openWithApplication(applicationId) {
+        const [item] = this.selectedItems;
+        if (!item)
+            return;
+
+        const application = Gio.DesktopAppInfo.new(applicationId);
+        if (!application) {
+            printerr(`iconView: no application with id ${applicationId}`);
+            return;
+        }
+
+        const type = item.isDirectory ? 'inode/directory' : item.contentType;
+        try {
+            application.set_as_default_for_type(type);
+        } catch (error) {
+            printerr(`iconView: cannot make ${applicationId} the default: ${error.message}`);
+        }
+
+        const context = this.get_display().get_app_launch_context();
+        context.set_timestamp(Gdk.CURRENT_TIME);
+        try {
+            application.launch_uris([item.uri], context);
+        } catch (error) {
+            printerr(`iconView: cannot open with ${applicationId}: ${error.message}`);
+        }
+    }
+
     _openWith() {
         const [item] = this.selectedItems;
         if (!item)
@@ -802,13 +916,6 @@ function uniqueName(directory, base) {
         if (!directory.get_child(candidate).query_exists(null))
             return candidate;
     }
-}
-
-/**
- * @param {string} uri - what to hand to the default handler
- */
-function launchUri(uri) {
-    Gio.AppInfo.launch_default_for_uri_async(uri, null, null, null);
 }
 
 /**

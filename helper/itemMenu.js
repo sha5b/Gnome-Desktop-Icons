@@ -10,6 +10,7 @@
 // the menu is rebuilt on every click from the selection in front of it.
 
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 
 // Content types we can act on beyond opening. Kept explicit rather than
 // pattern-matched on the string: "image/" would sweep in things like
@@ -39,6 +40,8 @@ export function buildItemMenu(items) {
     const edit = new Gio.Menu();
     edit.append('Cut', 'desktop.cut');
     edit.append('Copy', 'desktop.copy');
+    if (single)
+        edit.append('Rename…', 'desktop.rename');
     edit.append(items.length > 1 ? `Move ${items.length} Items to Trash` : 'Move to Trash',
         'desktop.trash');
     menu.append_section(null, edit);
@@ -69,9 +72,58 @@ function openSection(items, single) {
         section.append('Open', 'desktop.open');
 
     if (single)
-        section.append('Open With…', 'desktop.open-with');
+        section.append_submenu('Open With', openWithMenu(single));
 
     return section;
+}
+
+/**
+ * Every application registered for this file's type.
+ *
+ * The entries are radio items bound to one stateful action, with the dot on
+ * whichever application is currently the default. Activating an entry makes
+ * that application the default *and* opens the file with it — which is what
+ * picking an application from this list is nearly always meant to do, and it
+ * saves a second trip through a dialog to make the choice stick.
+ *
+ * @param {object} item - the selected item
+ * @returns {Gio.Menu} the submenu
+ */
+function openWithMenu(item) {
+    const menu = new Gio.Menu();
+    const type = item.isDirectory ? 'inode/directory' : item.contentType;
+
+    // Recommended applications first — the ones that registered for this exact
+    // type — then anything else that merely claims to cope with it.
+    const seen = new Set();
+    const applications = [
+        ...Gio.AppInfo.get_recommended_for_type(type),
+        ...Gio.AppInfo.get_all_for_type(type),
+    ].filter(application => {
+        const id = application.get_id();
+        if (!id || seen.has(id) || !application.should_show())
+            return false;
+
+        seen.add(id);
+        return true;
+    });
+
+    const applicationSection = new Gio.Menu();
+    for (const application of applications) {
+        const entry = Gio.MenuItem.new(application.get_display_name(), null);
+        entry.set_action_and_target_value('desktop.default-app',
+            new GLib.Variant('s', application.get_id()));
+        applicationSection.append_item(entry);
+    }
+
+    if (applications.length > 0)
+        menu.append_section(null, applicationSection);
+
+    const other = new Gio.Menu();
+    other.append('Other Application…', 'desktop.open-with');
+    menu.append_section(null, other);
+
+    return menu;
 }
 
 /**
@@ -95,6 +147,14 @@ function contextSection(single) {
         section.append('Allow Launching', 'desktop.allow-launching');
 
     return section;
+}
+
+/**
+ * @param {object} item - a FileModel item
+ * @returns {string} the id of its default application, or "" if it has none
+ */
+export function defaultApplicationId(item) {
+    return defaultHandler(item)?.get_id() ?? '';
 }
 
 /**
@@ -126,10 +186,10 @@ export function actionAvailability(items) {
         'allow-launching': Boolean(single &&
             single.contentType === 'application/x-desktop' && !single.isExecutable),
         'open-with': Boolean(single),
+        'rename': Boolean(single),
         'open': items.length > 0,
         'cut': items.length > 0,
         'copy': items.length > 0,
-        'show-in-files': items.length > 0,
         'trash': items.length > 0,
         'properties': items.length > 0,
     };

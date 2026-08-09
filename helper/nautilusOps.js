@@ -117,14 +117,6 @@ export class NautilusOps {
     }
 
     /**
-     * @param {string[]} uris - files to reveal in a Files window
-     */
-    async showItems(uris) {
-        await this._callReporting(MANAGER, 'ShowItems',
-            new GLib.Variant('(ass)', [uris, '']));
-    }
-
-    /**
      * @param {string[]} uris - files whose Properties window to open
      */
     async showProperties(uris) {

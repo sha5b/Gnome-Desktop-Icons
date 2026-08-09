@@ -219,13 +219,20 @@ class DesktopHelper {
     }
 
     _open(items) {
+        // Launch through the display's context, not with a null one. It carries
+        // the startup-notification id and the display environment, which is what
+        // tells the new process which monitor and which scale factor it is
+        // starting on; without it some applications come up at the wrong size.
+        const context = Gdk.Display.get_default().get_app_launch_context();
+        context.set_timestamp(Gdk.CURRENT_TIME);
+
         for (const item of items) {
             if (isTrustedLauncher(item)) {
-                launchDesktopEntry(item);
+                launchDesktopEntry(item, context);
                 continue;
             }
 
-            Gio.AppInfo.launch_default_for_uri_async(item.uri, null, null,
+            Gio.AppInfo.launch_default_for_uri_async(item.uri, context, null,
                 (_source, result) => {
                     try {
                         Gio.AppInfo.launch_default_for_uri_finish(result);
@@ -239,8 +246,9 @@ class DesktopHelper {
 
 /**
  * @param {object} item - a .desktop file the user has marked executable
+ * @param {Gdk.AppLaunchContext} context - the display's launch context
  */
-function launchDesktopEntry(item) {
+function launchDesktopEntry(item, context) {
     const appInfo = Gio.DesktopAppInfo.new_from_filename(item.file.get_path());
     if (!appInfo) {
         printerr(`helper: ${item.name} is not a valid desktop entry`);
@@ -248,7 +256,7 @@ function launchDesktopEntry(item) {
     }
 
     try {
-        appInfo.launch([], null);
+        appInfo.launch([], context);
     } catch (error) {
         printerr(`helper: cannot launch ${item.name}: ${error.message}`);
     }

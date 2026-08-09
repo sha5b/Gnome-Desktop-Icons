@@ -151,7 +151,15 @@ export function addDropTarget(view, {onFiles, onText, onTexture, onMotion, onLea
     });
     target.set_gtypes([Gdk.FileList.$gtype, Gdk.Texture.$gtype, GObject.TYPE_STRING]);
 
-    target.connect('motion', (_target, x, y) => onMotion(x, y));
+    // GTK insists on exactly one action here. Returning a mask of all three
+    // makes it complain ("did not return a unique preferred action") on every
+    // motion event and fall back to nothing.
+    target.connect('motion', (_target, x, y) => {
+        onMotion(x, y);
+
+        const drop = target.get_current_drop();
+        return drop ? preferredAction(drop) : Gdk.DragAction.COPY;
+    });
     target.connect('leave', () => onLeave());
 
     target.connect('drop', (_target, value, x, y) => {

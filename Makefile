@@ -57,7 +57,10 @@ helper:
 ##   make run DEBUG=1      with lifecycle tracing on stderr
 ##
 ## The thumbnail cache is shared with the real session on purpose, so a test run
-## does not regenerate every thumbnail from scratch.
+## does not regenerate every thumbnail from scratch. Your real ~/.local/share is
+## added to XDG_DATA_DIRS, read-only, so Flatpak applications and installed icon
+## themes are still found; only `enabled-extensions` in the scratch profile
+## decides what loads, so none of your other extensions come along.
 run: schemas
 	@profile=$$(mktemp -d /tmp/$(UUID).XXXXXX); \
 	mkdir -p $$profile/data/gnome-shell/extensions $$profile/config/glib-2.0/settings; \
@@ -69,6 +72,7 @@ run: schemas
 	  > $$profile/config/glib-2.0/settings/keyfile; \
 	echo "scratch profile: $$profile"; \
 	XDG_DATA_HOME=$$profile/data \
+	XDG_DATA_DIRS=$(HOME)/.local/share:$${XDG_DATA_DIRS:-/usr/local/share:/usr/share} \
 	XDG_CONFIG_HOME=$$profile/config \
 	XDG_CACHE_HOME=$(HOME)/.cache \
 	GSETTINGS_BACKEND=keyfile \
