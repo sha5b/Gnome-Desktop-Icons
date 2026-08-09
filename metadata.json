@@ -1,8 +1,10 @@
 {
   "uuid": "gnome-desktop-icons@ned.tabulov.gmail.com",
   "name": "Gnome Desktop Icons",
-  "description": "Draws file icons on the desktop.\n\nRendering, drag-and-drop and menus run in a separate GTK4 helper process, because GTK cannot be imported into GNOME Shell. File operations are delegated to Nautilus over D-Bus, so the desktop shares its progress windows, its dialogs and its undo stack.\n\nCut, Copy and Paste read and write the system clipboard, in the same formats Files uses, so copying in one and pasting in the other works. Clipboard contents are never sent anywhere.",
-  "shell-version": ["50"],
+  "description": "Draws file icons on the desktop.\n\nA separate GTK4 helper process does the rendering, the drag-and-drop and the menus. An extension must not import GTK into GNOME Shell, so the work happens there. The extension hands every file operation to Nautilus over D-Bus. The desktop therefore shares the progress windows, the dialogs and the undo stack of Files.\n\nCut, Copy and Paste read and write the system clipboard. They use the formats Files uses, so you can copy in one and paste in the other. The extension never sends clipboard contents anywhere.",
+  "shell-version": [
+    "50"
+  ],
   "url": "https://github.com/sha5b/Gnome-Desktop-Icons",
   "settings-schema": "org.gnome.shell.extensions.gnome-desktop-icons",
   "gettext-domain": "gnome-desktop-icons",

@@ -7,7 +7,7 @@ drag-and-drop and file operations delegated to Nautilus.
 ## 0. Status — next up
 
 **M0 done.** Repo skeleton, extension, helper, IPC, Makefile and lint config
-all written and running. `make check` parses every source file; the helper runs
+all written and running. `make check` parses every source file. The helper runs
 standalone (`make helper`) and exits cleanly on EOF.
 
 **M0.5 done — every question answered PASS.** Measured in a nested devkit shell
@@ -37,14 +37,14 @@ Nothing is left blocking the architecture. `spike/` and its two references in
 **A headless shell cannot answer input questions.** An earlier run under
 `--headless --virtual-monitor` reported the window clamped to the work area,
 lost pointer clicks entirely, and read `warp_pointer()` back with one axis
-zeroed. All three were artefacts of the headless backend; none reproduced under
+zeroed. All three were artifacts of the headless backend. None reproduced under
 `--devkit`. Use headless for logic and screenshots only.
 
-**M1 done.** The probe is gone; the shell-process half is complete and verified
-in a devkit shell:
+**M1 done.** The probe is gone. The shell-process half is complete, and a
+devkit shell verified it:
 
-- enable → helper spawned, window adopted and placed; disable → window released,
-  helper killed, zero stray processes; re-enable → clean, `State: ACTIVE`, no
+- enable → helper spawned, window adopted and placed. disable → window released,
+  helper stopped, zero stray processes. re-enable → clean, `State: ACTIVE`, no
   errors. `kill -9` on the helper → detected, window released, restarted after
   the 1s backoff, window re-adopted.
 - `workareas-changed` fires on every maximise, so `MonitorTracker` compares
@@ -58,7 +58,7 @@ in a devkit shell:
   `GNOME_DESKTOP_ICONS_DEBUG_SHOT=<path>` writes a screenshot of the stage — the
   only way to see a nested shell, since the Screenshot D-Bus method refuses
   every caller but the shell's own UI.
-- `make lint` is clean against the flat ESLint config; `make check` parses every
+- `make lint` is clean against the flat ESLint config. `make check` parses every
   file.
 
 **M2, M3 and most of M4 done** — the desktop draws real files and its menus
@@ -97,8 +97,8 @@ missing monitor as loss of live updates rather than a fatal error.
 uuid `gnome-desktop-icons@ned.tabulov.gmail.com`, by Shahab Nedaei.
 
 - Drag out offers `text/uri-list`, `x-special/gnome-copied-files` and plain
-  text. Drop in accepts files, text and images; the last two are written into
-  ~/Desktop as new files.
+  text. Drop in accepts files, text and images. The last two become new files in
+  ~/Desktop.
 - Icon positions persist in `metadata::nautilus-icon-position` as global logical
   coordinates, which encodes both where an icon is and which monitor it is on.
   A position belonging to a monitor that is gone fails the bounds test and the
@@ -111,11 +111,11 @@ Three bugs found while building it:
 1. **A drag source on the icon never fires.** The view's click gesture claims
    the button press first, which cancels the child's gesture before it reaches
    GTK's drag threshold. Both controllers now live on the view, which hit-tests
-   in `prepare`; GTK then arbitrates properly — click wins a tap, drag wins a
+   in `prepare`. GTK then arbitrates properly: a click wins a tap, a drag wins a
    pull.
 2. **A metadata write is not a file change.** The directory monitor never fires
-   for it, so after a drop the view has to re-lay-out itself; waiting for the
-   model meant the icon snapped back.
+   for it, so after a drop the view must lay itself out again. Waiting for the
+   model made the icon snap back.
 3. **Multi-monitor layout used global coordinates** for a widget whose own
    coordinates are monitor-local, so everything on a second monitor would have
    been laid out past the right-hand edge of the world.
@@ -151,8 +151,8 @@ Bugs found by running it, each fixed:
 - `make run` hid `~/.local/share`, so Flatpak-exported MIME icons vanished.
 - `String.prototype.format` does not exist in an ES module — the gettext work
   briefly broke every item menu with it.
-- A drag source on the icon is cancelled by the view's click gesture; both must
-  live on the same widget.
+- The view's click gesture cancels a drag source on the icon. Both must live on
+  the same widget.
 - A metadata write does not fire the directory monitor, so a drop must re-lay
   out the view itself.
 
@@ -184,7 +184,7 @@ Runtime-checked on this machine, not assumed.
 | GNOME Shell | 50.4 | ESM extensions, `Extension` base class |
 | Mutter | 18 | `Meta-18`, `Mtk-18`, `Clutter-18` typelibs |
 | GJS | 1.88.1 | |
-| Session | Wayland | shell cannot be restarted; dev happens in a devkit shell |
+| Session | Wayland | shell cannot be restarted, so work happens in a devkit shell |
 | Nautilus | 50.2.2 | D-Bus activatable |
 | gnome-desktop4 | 44.5 | `GnomeDesktop-4.0` → thumbnail factory |
 | GTK | 4.x | `GdkWayland-4.0`, `GdkX11-4.0` both introspectable |
@@ -208,7 +208,7 @@ Runtime-checked on this machine, not assumed.
 
 - DING is not packaged in Fedora 44 — no conflict
 - Mutter does not implement `wlr-layer-shell` — that route is closed
-- `gnome-shell --nested` no longer exists on Shell 50; the flag is `--devkit`
+- `gnome-shell --nested` no longer exists on Shell 50. The flag is `--devkit`
 
 ## 2. Framing
 
@@ -224,7 +224,7 @@ resolves through the active GTK icon theme, and thumbnails live in
 ## 3. Architecture
 
 Two processes. Nearly all logic lives in the helper, an ordinary GTK4
-application; the extension stays small and holds the only version-fragile code.
+application. The extension stays small and holds the only version-fragile code.
 
 ```
 ┌─ gnome-shell process ───────────────────────────────┐
@@ -327,7 +327,7 @@ Rules from the review guidelines and best-practices pages that shape the build:
 - `destroy()` order: remove sources → disconnect signals → release children →
   `super.destroy()` last
 - Override `destroy()` rather than connecting to the `destroy` signal
-- No `_destroyed` boolean guards; null the instance instead
+- No `_destroyed` boolean guards. Null the instance instead
 - Be ready for `disable()` at any time
 
 **Process boundaries**
@@ -337,7 +337,7 @@ Rules from the review guidelines and best-practices pages that shape the build:
 
 **Forbidden**
 - Deprecated `ByteArray`, `Lang`, `Mainloop`
-- Bundled binaries or shared libraries; obfuscated or minified code
+- Bundled binaries or shared libraries, obfuscated or minified code
 - Telemetry
 - `run_dispose()` without documented cause
 
@@ -355,8 +355,8 @@ Rules from the review guidelines and best-practices pages that shape the build:
 - No `gnome.org` namespace in the UUID
 
 **Code style**
-- Modular files with single responsibilities; small entry point
-- No defensive `?.()` or `typeof x === 'function'` checks on guaranteed APIs;
+- Modular files with single responsibilities, and a small entry point
+- No defensive `?.()` or `typeof x === 'function'` checks on guaranteed APIs.
   target Shell 50 specifically rather than writing multi-version compatibility
 - No redundant try/catch around `destroy()`, `disconnect()`, `GLib.Source.remove()`
 - `this.getSettings()` with no argument, relying on `settings-schema`
@@ -410,21 +410,21 @@ Which extensions load is controlled by `enabled-extensions` in
 which keeps the throwaway shell from loading the real session's extensions.
 
 Two traps met while setting this up. `gnome-shell --wayland` on its own no
-longer nests — it tries to take the seat and dies with `EBUSY`; `--devkit` is
+longer nests. It tries to take the seat and dies with `EBUSY`. `--devkit` is
 the only nested mode. And never reach for `pkill -f gnome-shell`: the pattern
 matches the shell running the command, which then kills itself. Write the pid
 to a file at launch and kill that.
 
 ### M0.5 — Layering smoke test — done
 Throwaway code in `spike/`, wired in from `extension.js` by two lines. All
-questions answered PASS; see §0. First job in M1 is to delete `spike/`, the two
+questions answered PASS. See §0. First job in M1 is to delete `spike/`, the two
 lines in `extension.js`, and the probe widgets in `helper/desktopWindow.js`
 along with the outline rule in `data/helper.css`.
 
 ### M1 — Extension: lifecycle, geometry, layering — done
-- ✅ Spawn and supervise the helper; restart with backoff; kill cleanly on `disable()`
+- ✅ Spawn and supervise the helper, restart with backoff, stop cleanly on `disable()`
 - ✅ Track `Main.layoutManager.monitors`, `monitors-changed`, workarea and
-  scale-factor changes; push geometry over IPC, skipping no-op republishes
+  scale-factor changes, and push geometry over IPC without no-op republishes
 - ✅ Apply `set_type()` + `hide_from_window_list()` on helper windows
 - ✅ Confine every Shell-internal (as opposed to Mutter) API touch to
   `src/shellCompat.js`, which hands back disconnect thunks so `disable()` never
@@ -441,11 +441,11 @@ along with the outline rule in `data/helper.css`.
 ### M3 — Helper: file model and rendering
 - Async `enumerate_children_async` on `~/Desktop` with
   `standard::*,thumbnail::*,metadata::*,access::*,time::modified,trash::*`
-- `Gio.FileMonitor` for live changes; `Gio.VolumeMonitor` for drives
+- `Gio.FileMonitor` for live changes, `Gio.VolumeMonitor` for drives
 - Special items: Home, Trash (`trash:///` with count), mounted volumes, each
   toggleable
 - Position persistence via the `metadata::nautilus-icon-position` file attribute
-- Icons from `fileInfo.get_icon()`; thumbnails from `thumbnail::path`, missing
+- Icons from `fileInfo.get_icon()`, thumbnails from `thumbnail::path`, missing
   ones generated with `GnomeDesktop.DesktopThumbnailFactory`
 - Emblems: symlink, unreadable, untrusted launcher
 - `.desktop` files via `Gio.DesktopAppInfo.new_from_filename`, honouring the
@@ -461,7 +461,7 @@ along with the outline rule in `data/helper.css`.
 - Background menu: New Folder, New Document (`~/Templates`), Paste, Select All,
   Sort By, Change Background, Display Settings
 - Inline rename
-- Accessibility: the guide has a dedicated page; icons need accessible names and
+- Accessibility: the guide has a dedicated page. Icons need accessible names and
   keyboard reachability
 
 ### M5 — Drag and drop (the reason for this architecture)
@@ -478,9 +478,9 @@ along with the outline rule in `data/helper.css`.
 ### M6 — Nautilus integration
 - `NautilusOps`: async proxy over `FileOperations2` for Copy, Move, Trash,
   Delete, CreateFolder, Rename, Undo, Redo, with a Gio fallback
-- `FileManager1.ShowItems` for "Show in Files"; `ShowItemProperties` for the
+- `FileManager1.ShowItems` for "Show in Files", `ShowItemProperties` for the
   Properties dialog, so we build none of our own
-- Trash icon reflects empty/full; Empty Trash routed through Nautilus
+- Trash icon reflects empty/full. Nautilus does Empty Trash
 
 ### M7 — Preferences, polish, packaging
 - `prefs.js` with `ExtensionPreferences.fillPreferencesWindow()` + Adw
@@ -499,7 +499,7 @@ along with the outline rule in `data/helper.css`.
 | ~~Transparent bottom-stacked window may not take input~~ | Closed in M0.5: pointer and keyboard both arrive |
 | Headless test runs give false negatives | Real behaviour only under `--devkit`; headless is for logic and screenshots |
 | Shell internals drift between releases | Prefer Mutter/platform API; confine Shell internals to `shellCompat.js` |
-| Helper crash loop | Supervised restart with backoff; extension survives without it |
+| Helper crash loop | Supervised restart with backoff. The extension survives without it |
 | Cleanup mistakes failing review | `enable()`/`disable()` adjacent; store every handler id and source id |
 | Two-process complexity | Helper is a standalone GTK4 app, runnable and debuggable outside the shell |
 
