@@ -27,6 +27,10 @@ import GLib from 'gi://GLib';
 
 import {debug} from './debug.js';
 
+// GLib exposes no signal constants; 15 is SIGTERM on every platform GNOME runs
+// on, and Gio.Subprocess.send_signal() takes the raw number.
+const SIGTERM = 15;
+
 const RESTART_DELAY_INITIAL_SECONDS = 1;
 const RESTART_DELAY_MAX_SECONDS = 30;
 // A helper that stayed up this long counts as healthy, so the backoff resets.
@@ -116,10 +120,14 @@ export class HelperProcess {
         }
         GLib.unlink(this._socketPath);
 
-        // SIGKILL rather than a polite quit message: disable() must complete
-        // synchronously, so there is no point waiting for a clean shutdown.
+        // Ask, do not shoot. Dropping the connection above already gives the
+        // helper an EOF, which is its cue to quit; SIGTERM is the follow-up for
+        // a helper that is wedged. force_exit() is SIGKILL, which would deny it
+        // the chance to close its windows, and the guidelines are explicit that
+        // spawned processes must exit cleanly. disable() does not wait for it:
+        // the process is a child of the shell and cannot outlive the session.
         if (this._subprocess) {
-            this._subprocess.force_exit();
+            this._subprocess.send_signal(SIGTERM);
             this._subprocess = null;
         }
     }

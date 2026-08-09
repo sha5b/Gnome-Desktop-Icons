@@ -121,10 +121,13 @@ function contextSection(single) {
     if (single.isDirectory)
         section.append(_('Open in Terminal'), 'desktop.open-terminal');
 
-    if (isRunnable(single)) {
+    // Run only as the user. Running a desktop script as root would be a
+    // privileged subprocess, which the review guidelines say must go through
+    // pkexec *and* must not be a script a user process can modify — and a file
+    // on your own desktop is exactly that. The two conditions cannot both hold,
+    // so the terminal opens unprivileged and `sudo` is one word away.
+    if (isRunnable(single))
         section.append(_('Run in Terminal'), 'desktop.run');
-        section.append(_('Run as Administrator'), 'desktop.run-as-root');
-    }
 
     if (!single.special && WALLPAPER_TYPES.has(single.contentType))
         section.append(_('Set as Background'), 'desktop.set-background');
@@ -181,7 +184,6 @@ export function actionAvailability(items) {
         'open-terminal': Boolean(single?.isDirectory),
         'empty-trash': single?.special === 'trash' && !single.trashEmpty,
         'run': Boolean(single && isRunnable(single)),
-        'run-as-root': Boolean(single && isRunnable(single)),
         'eject': Boolean(single?.special === 'volume' && single.canEject),
         'set-background': Boolean(single && WALLPAPER_TYPES.has(single.contentType)),
         'allow-launching': Boolean(single &&

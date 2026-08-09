@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Gnome Desktop Icons\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-09 20:04+0200\n"
+"POT-Creation-Date: 2026-08-09 20:10+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -133,7 +133,7 @@ msgstr ""
 msgid "Change Background…"
 msgstr ""
 
-#: helper/iconView.js:939
+#: helper/iconView.js:938
 msgid "Untitled Folder"
 msgstr ""
 
@@ -192,19 +192,15 @@ msgstr ""
 msgid "Eject"
 msgstr ""
 
-#: helper/itemMenu.js:125
+#: helper/itemMenu.js:130
 msgid "Run in Terminal"
 msgstr ""
 
-#: helper/itemMenu.js:126
-msgid "Run as Administrator"
-msgstr ""
-
-#: helper/itemMenu.js:130
+#: helper/itemMenu.js:133
 msgid "Set as Background"
 msgstr ""
 
-#: helper/itemMenu.js:135
+#: helper/itemMenu.js:138
 msgid "Allow Launching"
 msgstr ""
 

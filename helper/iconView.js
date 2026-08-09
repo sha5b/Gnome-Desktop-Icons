@@ -797,8 +797,7 @@ class IconView extends Gtk.Fixed {
             'open-terminal': () => this._openTerminalInSelection(),
             'rename': () => this._renameSelection(),
             'empty-trash': () => this._operations.emptyTrash(),
-            'run': () => this._runSelection(false),
-            'run-as-root': () => this._runSelection(true),
+            'run': () => this._runSelection(),
             'eject': () => this._ejectSelection(),
             'cut': () => this._toClipboard('cut'),
             'copy': () => this._toClipboard('copy'),
@@ -816,10 +815,10 @@ class IconView extends Gtk.Fixed {
         };
     }
 
-    _runSelection(asRoot) {
+    _runSelection() {
         const [item] = this.selectedItems;
         if (item)
-            runInTerminal(item.file, asRoot);
+            runInTerminal(item.file);
     }
 
     _ejectSelection() {

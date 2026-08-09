@@ -33,6 +33,39 @@ make pack
 > every handler disconnected through the thunks `src/shellCompat.js` hands back,
 > and every GLib source removed.
 
+## Audited against the review guidelines
+
+Four things came out of reading the guidelines line by line rather than from
+memory. Two were MUSTs we were breaking.
+
+**Clipboard use is now declared in the description.** "Extensions that access
+the clipboard, with or without user interaction, **MUST** declare it in the
+description." Cut, Copy and Paste do. Clipboard data goes nowhere but the
+clipboard.
+
+**"Run as Administrator" is gone.** "Spawning privileged subprocesses should be
+avoided at all costs. If absolutely necessary, the subprocess **MUST** be run
+with `pkexec` and **MUST NOT** be an executable or script that can be modified
+by a user process." A script sitting on the user's own desktop fails the second
+condition however it is launched, so no implementation of that menu item could
+pass. "Run in Terminal" stays, unprivileged; typing `sudo` in the terminal it
+opens is one word and is the user's decision.
+
+**The helper is now asked to exit, not killed.** "Processes **MUST** be spawned
+carefully and exit cleanly." `disable()` used `force_exit()`, which is SIGKILL.
+It now drops the socket — the helper's cue to quit — and follows with SIGTERM.
+
+**No .po or .pot in the package.** The guidelines name them as unnecessary
+files. `--podir` compiles them to a single .mo; the sources stay in the repo.
+
+One judgement call worth naming to a reviewer: "An extension **MUST NOT** ship
+with default keyboard shortcuts for interacting with clipboard data." Ctrl+C,
+Ctrl+X and Ctrl+V are handled, but only as ordinary key events on the desktop
+widget while it has focus — the same as in any text entry. Nothing is registered
+with the shell's keybinding system, and no shortcut works while another window
+is focused. If a reviewer reads the rule more strictly than that, the handlers
+can go without affecting the menus.
+
 ## Checklist
 
 - [x] `metadata.json`: uuid, name, description, `shell-version: ["50"]`, url,
@@ -45,6 +78,21 @@ make pack
 - [x] `make lint` clean; `make check` parses every file as an ES module.
 - [x] Verified from the built package: unzip, `glib-compile-schemas schemas/`,
       load in a nested shell. Also verified in German (`LANGUAGE=de`).
+- [x] Clipboard access declared in the description.
+- [x] No privileged subprocess of any kind.
+- [x] Spawned helper exits on EOF, then SIGTERM; never SIGKILL.
+- [x] Package holds no .po/.pot, no build scripts, no screenshots.
+- [x] Logging is off unless `GNOME_DESKTOP_ICONS_DEBUG=1`; nothing logs per item.
+
+## On AI assistance
+
+The guidelines allow AI "as a learning aid or a development tool" but expect the
+submitter to "be able to justify and explain the code they submit". This
+codebase was written with Claude. Every non-obvious decision is commented with
+its reasoning in the source — why the process is split, why IPC is a socket and
+not stdout, why the drag source sits on the view, why "Run as Administrator" is
+absent — so the explanations are in the code rather than only in someone's head.
+Worth reading through before answering a reviewer's question.
 
 ## Known tool problem
 

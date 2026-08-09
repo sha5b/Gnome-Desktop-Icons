@@ -63,23 +63,23 @@ export function openTerminal(directory) {
 }
 
 /**
- * Run a script in a terminal window, optionally as root.
+ * Run a script in a terminal window, as the user.
  *
  * The terminal is kept open after the script finishes. A script that fails in
  * a window that vanishes with it is a script that cannot be debugged, and the
  * whole point of running it in a terminal rather than silently is to watch what
  * it does.
  *
- * As root it uses plain `sudo`, which asks for the password in that terminal.
- * pkexec would pop a graphical prompt instead, but it also scrubs the
- * environment and refuses anything without a policy file, which is the wrong
- * behaviour for "run this script of mine".
+ * There is deliberately no "as root" variant. The review guidelines require a
+ * privileged subprocess to run under pkexec *and* not to be a script a user
+ * process can modify; a file on the user's own desktop fails the second
+ * condition no matter how it is launched. The terminal is right there, and
+ * typing `sudo` in it is the user's call, not ours.
  *
  * @param {Gio.File} script - the file to run
- * @param {boolean} asRoot - whether to run it under sudo
  * @returns {boolean} whether a terminal was launched
  */
-export function runInTerminal(script, asRoot) {
+export function runInTerminal(script) {
     const path = script.get_path();
     if (!path) {
         printerr('terminal: refusing to run a script from a non-local location');
@@ -87,10 +87,8 @@ export function runInTerminal(script, asRoot) {
     }
 
     const directory = script.get_parent()?.get_path() ?? GLib.get_home_dir();
-    const quoted = GLib.shell_quote(path);
-    const command = asRoot ? `sudo ${quoted}` : quoted;
     // Keep the window open on exit, and say why it closed.
-    const shellScript = `${command}; status=$?; echo; ` +
+    const shellScript = `${GLib.shell_quote(path)}; status=$?; echo; ` +
         'echo "[exited with $status — press Enter to close]"; read _';
 
     for (const terminal of candidates()) {
