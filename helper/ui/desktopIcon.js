@@ -17,8 +17,10 @@
 // wins — a photograph of the file's contents says more than either.
 
 import GObject from 'gi://GObject';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 import Pango from 'gi://Pango';
+
+import {_, format} from '../core/gettext.js';
 
 const LABEL_LINES = 2;
 
@@ -119,7 +121,9 @@ class DesktopIcon extends Gtk.Box {
 
     _accessibleName() {
         const {displayName, isDirectory, isSymlink} = this._item;
-        const kind = isDirectory ? 'folder' : 'file';
-        return isSymlink ? `${displayName}, link to a ${kind}` : `${displayName}, ${kind}`;
+        const kind = isDirectory ? _('folder') : _('file');
+        return isSymlink
+            ? format(_('%s, link to a %s'), displayName, kind)
+            : format(_('%s, %s'), displayName, kind);
     }
 });

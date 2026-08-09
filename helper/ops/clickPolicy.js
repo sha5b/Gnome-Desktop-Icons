@@ -49,7 +49,10 @@ export class ClickPolicy {
     }
 
     _reload() {
-        const singleClick = this._settings.get_string('click-policy') === 'single';
+        // An older Nautilus can ship the schema without the key; fall back to
+        // double click, the GNOME default, exactly as a missing schema does.
+        const singleClick = this._settings.settings_schema.has_key('click-policy') &&
+            this._settings.get_string('click-policy') === 'single';
         if (singleClick === this._singleClick)
             return;
 

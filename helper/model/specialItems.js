@@ -16,7 +16,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import {_} from './gettext.js';
+import {_} from '../core/gettext.js';
 
 export class SpecialItems {
     /**

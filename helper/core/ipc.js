@@ -52,7 +52,7 @@ export class Ipc {
         }
     }
 
-    close() {
+    destroy() {
         this._cancellable.cancel();
         this._input = null;
         this._output = null;

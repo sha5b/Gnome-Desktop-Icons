@@ -22,13 +22,13 @@
 // plain text, and images — the last two are written into ~/Desktop as new
 // files, the way Files does it.
 
-import Gdk from 'gi://Gdk';
+import Gdk from 'gi://Gdk?version=4.0';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 
-const URI_LIST = 'text/uri-list';
-const GNOME_COPIED_FILES = 'x-special/gnome-copied-files';
+export const URI_LIST = 'text/uri-list';
+export const GNOME_COPIED_FILES = 'x-special/gnome-copied-files';
 
 const DRAGGABLE_ACTIONS =
     Gdk.DragAction.COPY | Gdk.DragAction.MOVE | Gdk.DragAction.LINK;

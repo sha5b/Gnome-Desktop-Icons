@@ -12,11 +12,11 @@
 // The extension is left out of the initial selection, the way every file manager
 // does it, so typing replaces the name and keeps ".txt".
 
-import Gdk from 'gi://Gdk';
+import Gdk from 'gi://Gdk?version=4.0';
 import GObject from 'gi://GObject';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 
-import {_} from './gettext.js';
+import {_} from '../core/gettext.js';
 
 export const RenamePopover = GObject.registerClass(
 class RenamePopover extends Gtk.Popover {
@@ -75,7 +75,7 @@ class RenamePopover extends Gtk.Popover {
         // A name with a separator in it would silently move the file somewhere
         // else, which is never what a rename means.
         if (name.includes('/')) {
-            printerr('rename: refusing a name containing "/"');
+            printerr('renamePopover: refusing a name containing "/"');
             return;
         }
 

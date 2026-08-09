@@ -9,12 +9,12 @@
 // anything made transient for it inherits that position — the dialog would open
 // underneath every other window on screen.
 
-import Adw from 'gi://Adw';
+import Adw from 'gi://Adw?version=1';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 
-import {_, format, ngettext} from './gettext.js';
+import {_, format, ngettext} from '../core/gettext.js';
 
 export const OpenWithDialog = GObject.registerClass(
 class OpenWithDialog extends Adw.Window {

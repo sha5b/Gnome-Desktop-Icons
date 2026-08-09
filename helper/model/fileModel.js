@@ -12,7 +12,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import './promisify.js';
+import '../core/promisify.js';
 import {readPosition} from './iconPositions.js';
 
 const ATTRIBUTES = [
@@ -51,6 +51,7 @@ export class FileModel {
         this._cancellable = new Gio.Cancellable();
         this._settleId = 0;
         this._monitor = null;
+        this._readGeneration = 0;
     }
 
     /** @returns {object[]} the current items, already sorted */
@@ -74,7 +75,7 @@ export class FileModel {
         this._read();
     }
 
-    stop() {
+    destroy() {
         if (this._settleId) {
             GLib.Source.remove(this._settleId);
             this._settleId = 0;
@@ -112,6 +113,11 @@ export class FileModel {
     }
 
     async _read() {
+        // Reads overlap: the settle timer and setShowHidden do not wait for
+        // each other, and an older enumeration finishing last would restore
+        // stale state. Only the newest read may publish.
+        const generation = ++this._readGeneration;
+
         let infos;
         try {
             infos = await enumerate(this._directory, this._cancellable);
@@ -120,6 +126,9 @@ export class FileModel {
                 printerr(`fileModel: cannot read the desktop: ${error.message}`);
             return;
         }
+
+        if (generation !== this._readGeneration)
+            return;
 
         this._items = infos
             .filter(info => this._showHidden || !isHidden(info))

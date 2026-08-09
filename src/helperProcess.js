@@ -65,14 +65,17 @@ export class HelperProcess {
             `gnome-desktop-icons-${GLib.get_monotonic_time()}.sock`,
         ]);
         this._service = null;
+        this._incomingId = 0;
     }
 
     start() {
         this._stopping = false;
         this._cancellable = new Gio.Cancellable();
 
-        if (!this._listen())
+        if (!this._listen()) {
+            this._scheduleRestart();
             return;
+        }
 
         try {
             this._subprocess = Gio.Subprocess.new(
@@ -114,6 +117,8 @@ export class HelperProcess {
         this._pending = [];
 
         if (this._service) {
+            this._service.disconnect(this._incomingId);
+            this._incomingId = 0;
             this._service.stop();
             this._service.close();
             this._service = null;
@@ -156,7 +161,7 @@ export class HelperProcess {
         GLib.unlink(this._socketPath);
 
         this._service = new Gio.SocketService();
-        this._service.connect('incoming', (_service, connection) => {
+        this._incomingId = this._service.connect('incoming', (_service, connection) => {
             this._onIncoming(connection);
             return true;
         });

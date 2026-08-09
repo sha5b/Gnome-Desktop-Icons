@@ -9,9 +9,10 @@
 // application that will actually open the file. This module reproduces that:
 // the menu is rebuilt on every click from the selection in front of it.
 
+import Gdk from 'gi://Gdk?version=4.0';
 import Gio from 'gi://Gio';
 
-import {_, format, ngettext} from './gettext.js';
+import {_, format, ngettext} from '../core/gettext.js';
 
 // Things that can sensibly be *run* rather than opened. Executability alone is
 // not the test: a .sh the user never chmod'ed is still a script they mean to
@@ -169,6 +170,34 @@ export function defaultHandler(item) {
         return null;
 
     return Gio.AppInfo.get_default_for_type(item.contentType, false);
+}
+
+/**
+ * Whether opening this item means launching it rather than handing it to a
+ * viewer. Mirrors the check Files makes: a desktop entry is only launched when
+ * the user has marked it executable, otherwise it is just a text file.
+ *
+ * @param {object} item - a FileModel item
+ * @returns {boolean} true when the item is a launcher we may run
+ */
+export function isTrustedLauncher(item) {
+    return item.contentType === 'application/x-desktop' && item.isExecutable;
+}
+
+/**
+ * The display's launch context, stamped with the current time. Launch through
+ * it rather than with a null one: it carries the startup-notification id and
+ * the display environment, which is what tells the new process which monitor
+ * and which scale factor it is starting on; without it some applications come
+ * up at the wrong size.
+ *
+ * @param {Gdk.Display} display - the display to launch on
+ * @returns {Gdk.AppLaunchContext} the context, ready to launch with
+ */
+export function launchContext(display) {
+    const context = display.get_app_launch_context();
+    context.set_timestamp(Gdk.CURRENT_TIME);
+    return context;
 }
 
 /**

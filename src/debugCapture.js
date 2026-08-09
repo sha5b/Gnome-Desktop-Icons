@@ -110,6 +110,10 @@ export class DebugCapture {
         for (const id of this._timeoutIds)
             GLib.Source.remove(id);
         this._timeoutIds = [];
+
+        // A virtual device is an ordinary GObject with no explicit destroy;
+        // dropping the reference is the release.
+        this._pointer = null;
     }
 
     _defer(seconds, callback) {
@@ -128,13 +132,15 @@ export class DebugCapture {
         // press has to be a separate main-loop turn from the motion, or it is
         // delivered before the new pointer focus is established.
         seat.warp_pointer(x, y);
-        GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+        const id = GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+            this._timeoutIds = this._timeoutIds.filter(other => other !== id);
             this._pointer.notify_button(GLib.get_monotonic_time(),
                 button, Clutter.ButtonState.PRESSED);
             this._pointer.notify_button(GLib.get_monotonic_time(),
                 button, Clutter.ButtonState.RELEASED);
             debug(`clicked button ${button} at ${x},${y}`);
         });
+        this._timeoutIds.push(id);
     }
 
     /**
@@ -156,15 +162,19 @@ export class DebugCapture {
         // as the motion that created the pointer focus is not routed to the
         // surface the pointer just arrived on.
         seat.warp_pointer(x1, y1);
-        GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, DRAG_STEP_MILLISECONDS, () => {
-            this._pointer.notify_button(GLib.get_monotonic_time(),
-                Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
-        });
+        const pressId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
+            DRAG_STEP_MILLISECONDS, () => {
+                this._timeoutIds = this._timeoutIds.filter(other => other !== pressId);
+                this._pointer.notify_button(GLib.get_monotonic_time(),
+                    Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            });
+        this._timeoutIds.push(pressId);
 
         for (let step = 1; step <= DRAG_STEPS; step++) {
             const progress = step / DRAG_STEPS;
-            GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
+            const stepId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
                 (step + 1) * DRAG_STEP_MILLISECONDS, () => {
+                    this._timeoutIds = this._timeoutIds.filter(other => other !== stepId);
                     seat.warp_pointer(
                         Math.round(x1 + (x2 - x1) * progress),
                         Math.round(y1 + (y2 - y1) * progress));
@@ -175,6 +185,7 @@ export class DebugCapture {
                         debug(`dragged ${x1},${y1} to ${x2},${y2}`);
                     }
                 });
+            this._timeoutIds.push(stepId);
         }
     }
 

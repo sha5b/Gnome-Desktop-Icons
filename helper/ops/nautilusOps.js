@@ -25,7 +25,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import './promisify.js';
+import '../core/promisify.js';
 
 const OPERATIONS = {
     name: 'org.gnome.Nautilus',

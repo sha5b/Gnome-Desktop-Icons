@@ -8,14 +8,12 @@
 // can say whether this was a copy or a cut, which is why both are offered —
 // copy something in Files, paste it on the desktop, and the intent survives.
 
-import Gdk from 'gi://Gdk';
+import Gdk from 'gi://Gdk?version=4.0';
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 
-import {decodeGnomeCopiedFiles, encodeGnomeCopiedFiles, encodeUriList} from './dragAndDrop.js';
-
-const GNOME_COPIED_FILES = 'x-special/gnome-copied-files';
-const URI_LIST = 'text/uri-list';
+import {decodeGnomeCopiedFiles, encodeGnomeCopiedFiles, encodeUriList,
+    GNOME_COPIED_FILES, URI_LIST} from './dragAndDrop.js';
 
 /**
  * @param {Gdk.Clipboard} clipboard - the display's clipboard

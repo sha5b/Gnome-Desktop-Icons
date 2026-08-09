@@ -36,7 +36,7 @@ lint:
 ## reported as "failed to load". Does not resolve imports.
 check:
 	@tmp=$$(mktemp -d); status=0; \
-	for f in extension.js src/*.js helper/*.js; do \
+	for f in extension.js src/*.js helper/*.js helper/*/*.js; do \
 		cp "$$f" "$$tmp/check.mjs"; \
 		node --check "$$tmp/check.mjs" || { echo "  in $$f"; status=1; }; \
 	done; \
@@ -115,5 +115,5 @@ pot:
 		--package-name="Gnome Desktop Icons" \
 		--copyright-holder="Shahab Nedaei" \
 		--output=locale/$(GETTEXT_DOMAIN).pot \
-		extension.js prefs.js src/*.js helper/*.js
+		extension.js prefs.js src/*.js helper/*.js helper/*/*.js
 	@echo "wrote locale/$(GETTEXT_DOMAIN).pot"

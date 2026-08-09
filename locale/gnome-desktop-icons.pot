@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Gnome Desktop Icons\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-09 20:12+0200\n"
+"POT-Creation-Date: 2026-08-09 20:36+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,91 +18,109 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: prefs.js:19
+#: prefs.js:28
 msgid "File Type"
 msgstr ""
 
-#: prefs.js:20
+#: prefs.js:29
 msgid "Opening Application"
 msgstr ""
 
-#: prefs.js:24
+#: prefs.js:33
 msgid "Small"
 msgstr ""
 
-#: prefs.js:25
+#: prefs.js:34
 msgid "Standard"
 msgstr ""
 
-#: prefs.js:26
+#: prefs.js:35
 msgid "Large"
 msgstr ""
 
-#: prefs.js:37
+#: prefs.js:39
 msgid "Desktop"
 msgstr ""
 
-#: prefs.js:42
+#: prefs.js:44
 msgid "Icons"
 msgstr ""
 
-#: prefs.js:43
+#: prefs.js:45
 msgid ""
 "Click behaviour follows Files, so the desktop and file windows always agree."
 msgstr ""
 
-#: prefs.js:47
+#: prefs.js:49
 msgid "Icon Size"
 msgstr ""
 
-#: prefs.js:56
+#: prefs.js:58
 msgid "Icon Shows"
 msgstr ""
 
-#: prefs.js:57
+#: prefs.js:59
 msgid ""
 "“File Type” tells a .stl from a .obj. “Opening Application” changes the icon "
 "when you change the default program. A thumbnail wins over both."
 msgstr ""
 
-#: prefs.js:69
+#: prefs.js:70
 msgid "Show Hidden Files"
 msgstr ""
 
-#: prefs.js:70
+#: prefs.js:71
 msgid "Files whose name begins with a dot"
 msgstr ""
 
-#: prefs.js:79
+#: prefs.js:80
 msgid "Show on the Desktop"
 msgstr ""
 
-#: prefs.js:80
+#: prefs.js:81
 msgid "Places that are not files in the Desktop folder."
 msgstr ""
 
-#: prefs.js:84 helper/specialItems.js:81
+#: prefs.js:85 helper/specialItems.js:81
 msgid "Home"
 msgstr ""
 
-#: prefs.js:84
+#: prefs.js:85
 msgid "Your home folder"
 msgstr ""
 
-#: prefs.js:85 helper/specialItems.js:91
+#: prefs.js:86 helper/specialItems.js:91
 msgid "Wastebasket"
 msgstr ""
 
-#: prefs.js:85
+#: prefs.js:86
 msgid "Shows whether it is empty or full"
 msgstr ""
 
-#: prefs.js:86
+#: prefs.js:87
 msgid "Mounted Drives"
 msgstr ""
 
-#: prefs.js:86
+#: prefs.js:87
 msgid "USB sticks, discs and other mounts"
+msgstr ""
+
+#: helper/desktopIcon.js:124
+msgid "folder"
+msgstr ""
+
+#: helper/desktopIcon.js:124
+msgid "file"
+msgstr ""
+
+#: helper/desktopIcon.js:126
+#, javascript-format
+msgid "%s, link to a %s"
+msgstr ""
+
+#: helper/desktopIcon.js:127
+#, javascript-format
+msgid "%s, %s"
 msgstr ""
 
 #: helper/iconView.js:549
@@ -246,4 +264,9 @@ msgstr ""
 
 #: helper/renamePopover.js:46
 msgid "Rename"
+msgstr ""
+
+#: helper/terminal.js:97
+#, javascript-format
+msgid "[exited with %s — press Enter to close]"
 msgstr ""

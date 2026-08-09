@@ -9,21 +9,21 @@
 // monitor, which is how the grid, the menus and the file operations are
 // debugged without a shell in the way.
 
-import Adw from 'gi://Adw';
-import Gdk from 'gi://Gdk';
+import Adw from 'gi://Adw?version=1';
+import Gdk from 'gi://Gdk?version=4.0';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 import System from 'system';
 
-import {initTranslations} from './gettext.js';
-import {DesktopWindow} from './desktopWindow.js';
-import {FileModel} from './fileModel.js';
-import {Ipc} from './ipc.js';
-import {NautilusOps} from './nautilusOps.js';
-import {SpecialItems} from './specialItems.js';
-import {ThumbnailLoader} from './thumbnails.js';
-import {isTrustedLauncher} from './iconView.js';
+import {initTranslations} from './core/gettext.js';
+import {DesktopWindow} from './ui/desktopWindow.js';
+import {FileModel} from './model/fileModel.js';
+import {Ipc} from './core/ipc.js';
+import {isTrustedLauncher, launchContext} from './ui/itemMenu.js';
+import {NautilusOps} from './ops/nautilusOps.js';
+import {SpecialItems} from './model/specialItems.js';
+import {ThumbnailLoader} from './model/thumbnails.js';
 
 const APPLICATION_ID = 'io.github.sha5b.GnomeDesktopIcons';
 const HELPER_DIR = Gio.File.new_for_uri(import.meta.url).get_parent();
@@ -44,7 +44,6 @@ class DesktopHelper {
         this._socketPath = socketPath;
         this._windows = new Map(); // monitor index -> DesktopWindow
         this._ipc = null;
-        this._shellState = {overview: false};
         this._iconSize = DEFAULT_ICON_SIZE;
         this._iconSource = 'type';
 
@@ -105,7 +104,7 @@ class DesktopHelper {
         const gdkMonitor = display.get_monitors().get_item(0);
         const {width, height} = gdkMonitor.get_geometry();
 
-        printerr('helper: no --socket; running standalone in one window');
+        printerr('main: no --socket; running standalone in one window');
         this._setMonitors([{
             index: 0,
             x: 0,
@@ -123,7 +122,7 @@ class DesktopHelper {
     }
 
     _shutdown() {
-        this._model.stop();
+        this._model.destroy();
         this._special.destroy();
         this._thumbnails.destroy();
         this._operations.destroy();
@@ -133,7 +132,7 @@ class DesktopHelper {
         this._windows.clear();
 
         if (this._ipc) {
-            this._ipc.close();
+            this._ipc.destroy();
             this._ipc = null;
         }
     }
@@ -151,14 +150,11 @@ class DesktopHelper {
         case 'monitors':
             this._setMonitors(message.monitors);
             break;
-        case 'state':
-            this._setShellState({overview: message.overview});
-            break;
         case 'settings':
             this._setSettings(message);
             break;
         default:
-            printerr(`helper: unknown message "${message.type}"`);
+            printerr(`main: unknown message "${message.type}"`);
             break;
         }
     }
@@ -181,7 +177,6 @@ class DesktopHelper {
                     operations: this._operations,
                     onOpen: items => this._open(items),
                 });
-                window.setShellState(this._shellState);
                 this._windows.set(monitor.index, window);
             }
 
@@ -233,19 +228,8 @@ class DesktopHelper {
             this._setMonitors(this._monitors);
     }
 
-    _setShellState(state) {
-        this._shellState = state;
-        for (const window of this._windows.values())
-            window.setShellState(state);
-    }
-
     _open(items) {
-        // Launch through the display's context, not with a null one. It carries
-        // the startup-notification id and the display environment, which is what
-        // tells the new process which monitor and which scale factor it is
-        // starting on; without it some applications come up at the wrong size.
-        const context = Gdk.Display.get_default().get_app_launch_context();
-        context.set_timestamp(Gdk.CURRENT_TIME);
+        const context = launchContext(Gdk.Display.get_default());
 
         for (const item of items) {
             if (isTrustedLauncher(item)) {
@@ -258,7 +242,7 @@ class DesktopHelper {
                     try {
                         Gio.AppInfo.launch_default_for_uri_finish(result);
                     } catch (error) {
-                        printerr(`helper: cannot open ${item.uri}: ${error.message}`);
+                        printerr(`main: cannot open ${item.uri}: ${error.message}`);
                     }
                 });
         }
@@ -272,14 +256,14 @@ class DesktopHelper {
 function launchDesktopEntry(item, context) {
     const appInfo = Gio.DesktopAppInfo.new_from_filename(item.file.get_path());
     if (!appInfo) {
-        printerr(`helper: ${item.name} is not a valid desktop entry`);
+        printerr(`main: ${item.name} is not a valid desktop entry`);
         return;
     }
 
     try {
         appInfo.launch([], context);
     } catch (error) {
-        printerr(`helper: cannot launch ${item.name}: ${error.message}`);
+        printerr(`main: cannot launch ${item.name}: ${error.message}`);
     }
 }
 

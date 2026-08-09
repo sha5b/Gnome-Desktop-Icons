@@ -41,11 +41,6 @@ export function listWindows() {
     return global.get_window_actors().map(actor => actor.meta_window);
 }
 
-/** @returns {boolean} whether the overview is open or opening */
-export function overviewVisible() {
-    return Main.overview.visible;
-}
-
 /** Close the overview. Only the debug capture needs this. */
 export function hideOverview() {
     Main.overview.hide();
@@ -86,18 +81,4 @@ export function connectScaleChanged(callback) {
 export function connectWindowCreated(callback) {
     const id = global.display.connect('window-created', callback);
     return () => global.display.disconnect(id);
-}
-
-/**
- * @param {Function} onShowing - called when the overview starts opening
- * @param {Function} onHiding - called when the overview starts closing
- * @returns {Function} disconnect thunk
- */
-export function connectOverview(onShowing, onHiding) {
-    const showingId = Main.overview.connect('showing', onShowing);
-    const hidingId = Main.overview.connect('hiding', onHiding);
-    return () => {
-        Main.overview.disconnect(showingId);
-        Main.overview.disconnect(hidingId);
-    };
 }

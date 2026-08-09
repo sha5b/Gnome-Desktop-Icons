@@ -15,6 +15,8 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
+import {_, format} from '../core/gettext.js';
+
 const FALLBACK_TERMINALS = [
     'ptyxis',           // Fedora's default since 41
     'kgx',              // GNOME Console
@@ -87,9 +89,15 @@ export function runInTerminal(script) {
     }
 
     const directory = script.get_parent()?.get_path() ?? GLib.get_home_dir();
-    // Keep the window open on exit, and say why it closed.
+    // Keep the window open on exit, and say why it closed. The message is
+    // translated here, so the placeholder is a %s that bash's $status fills;
+    // the translated text is escaped for the double quotes around it before
+    // the placeholder goes in.
+    const message = format(
+        _('[exited with %s — press Enter to close]').replace(/["$`\\]/g, '\\$&'),
+        '$status');
     const shellScript = `${GLib.shell_quote(path)}; status=$?; echo; ` +
-        'echo "[exited with $status — press Enter to close]"; read _';
+        `echo "${message}"; read _`;
 
     for (const terminal of candidates()) {
         if (!GLib.find_program_in_path(terminal))

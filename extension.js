@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
-// Entry point. Everything here is lifecycle: build four objects in enable(),
-// tear the same four down in disable(). All real work happens in src/ and in
+// Entry point. Everything here is lifecycle: build three objects in enable(),
+// tear the same three down in disable(). All real work happens in src/ and in
 // the helper process.
 
 import GLib from 'gi://GLib';
@@ -13,7 +13,6 @@ import {debug} from './src/debug.js';
 import {DebugCapture, capturePath} from './src/debugCapture.js';
 import {HelperProcess} from './src/helperProcess.js';
 import {MonitorTracker} from './src/monitorTracker.js';
-import {ShellState} from './src/shellState.js';
 import {WindowLayering} from './src/windowLayering.js';
 
 export default class DesktopIconsExtension extends Extension {
@@ -24,7 +23,6 @@ export default class DesktopIconsExtension extends Extension {
 
         this._layering = new WindowLayering();
         this._monitors = new MonitorTracker(() => this._publishMonitors());
-        this._state = new ShellState(() => this._publishState());
         this._helper = new HelperProcess({
             argv: ['gjs', '-m', GLib.build_filenamev([this.path, 'helper', 'main.js'])],
             onMessage: message => this._onHelperMessage(message),
@@ -50,9 +48,6 @@ export default class DesktopIconsExtension extends Extension {
         this._helper.stop();
         this._helper = null;
 
-        this._state.destroy();
-        this._state = null;
-
         this._monitors.destroy();
         this._monitors = null;
 
@@ -68,10 +63,6 @@ export default class DesktopIconsExtension extends Extension {
         this._layering.setMonitors(monitors);
         this._helper.send({type: 'monitors', monitors});
         debug(`published ${monitors.length} monitor(s): ${monitors.map(describeMonitor).join(', ')}`);
-    }
-
-    _publishState() {
-        this._helper.send({type: 'state', ...this._state.snapshot()});
     }
 
     _publishSettings() {
@@ -93,10 +84,6 @@ export default class DesktopIconsExtension extends Extension {
             // knows nothing yet. Send it everything.
             this._publishSettings();
             this._publishMonitors();
-            this._publishState();
-            break;
-        case 'log':
-            console.log(`gnome-desktop-icons helper: ${message.text}`);
             break;
         default:
             console.warn(`gnome-desktop-icons: unknown message "${message.type}"`);

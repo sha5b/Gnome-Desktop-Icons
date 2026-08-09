@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright 2026 Shahab Nedaei <ned.tabulov@gmail.com>
 //
-// The grid of icons on one monitor: layout, selection, input and menus.
+// The grid of icons on one monitor: layout, selection, drag-and-drop and the
+// clipboard. The menus live in menus.js, the keyboard in keyboard.js; both
+// are handed this view and call back into it.
 //
 // Icons are placed on a Gtk.Fixed rather than a flow container. The desktop is
 // not a list — a file has a *position*, dragged there by the user and restored
@@ -12,27 +14,23 @@
 // fills the gaps in column order, so dropping a new file into the folder never
 // reshuffles the icons the user has already placed.
 
-import Gdk from 'gi://Gdk';
+import Gdk from 'gi://Gdk?version=4.0';
 import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 
-import {_} from './gettext.js';
+import {_} from '../core/gettext.js';
 import {DesktopIcon} from './desktopIcon.js';
-import {actionAvailability, buildItemMenu, defaultHandler} from './itemMenu.js';
-import {addDragSource, addDropTarget} from './dragAndDrop.js';
-import {clearPosition, writePosition} from './iconPositions.js';
-import {ClickPolicy} from './clickPolicy.js';
-import {OpenWithDialog} from './openWithDialog.js';
-import {RenamePopover} from './renamePopover.js';
-import {openTerminal, runInTerminal} from './terminal.js';
-import {pasteFromClipboard, setClipboard} from './clipboard.js';
+import {defaultHandler} from './itemMenu.js';
+import {Menus} from './menus.js';
+import {Keyboard} from './keyboard.js';
+import {addDragSource, addDropTarget} from '../dnd/dragAndDrop.js';
+import {clearPosition, writePosition} from '../model/iconPositions.js';
+import {ClickPolicy} from '../ops/clickPolicy.js';
+import {pasteFromClipboard, setClipboard} from '../dnd/clipboard.js';
 
 const CELL_PADDING = 12;
 const EDGE_MARGIN = 16;
-// How long a type-ahead search stays open after the last keystroke.
-const TYPE_AHEAD_MILLISECONDS = 1000;
 
 export const IconView = GObject.registerClass(
 class IconView extends Gtk.Fixed {
@@ -51,19 +49,14 @@ class IconView extends Gtk.Fixed {
         this._selection = new Set();
         this._workArea = null;
         this._directory = null;
-        this._typeAhead = '';
-        this._typeAheadId = 0;
 
         this._clickPolicy = new ClickPolicy(() => {});
-        this._rename = new RenamePopover({
-            onCommit: (item, name) => this._operations.rename(item.uri, name),
-        });
-        this._rename.set_parent(this);
+        this._menus = new Menus(this);
+        this._keyboard = new Keyboard(this);
 
         this.add_css_class('icon-view');
         this.set_focusable(true);
 
-        this._buildMenus();
         this._addControllers();
     }
 
@@ -121,6 +114,18 @@ class IconView extends Gtk.Fixed {
             this.setItems(this._directory, this._allItems);
         else
             this._layout();
+    }
+
+    /**
+     * Tears down what widget destruction will not: the keyboard's pending
+     * type-ahead source, the menus' parented popovers, and the GSettings
+     * listener behind the click policy. Call before the window holding the
+     * view is destroyed, or every rebuild leaks them.
+     */
+    destroy() {
+        this._keyboard.destroy();
+        this._menus.destroy();
+        this._clickPolicy.destroy();
     }
 
     // --- layout ---
@@ -233,7 +238,7 @@ class IconView extends Gtk.Fixed {
             let slot;
             let key;
             do {
-                slot = {column: Math.floor(next / rows), row: next % rows};
+                slot = slotForIndex(next, rows);
                 key = slotKey(slot);
                 next++;
             } while (taken.has(key));
@@ -304,11 +309,6 @@ class IconView extends Gtk.Fixed {
         secondary.connect('pressed', (_gesture, _nPress, x, y) =>
             this._onSecondaryPressed(x, y));
         this.add_controller(secondary);
-
-        const keys = new Gtk.EventControllerKey();
-        keys.connect('key-pressed', (_controller, keyval, _code, state) =>
-            this._onKeyPressed(keyval, state));
-        this.add_controller(keys);
 
         this._addDragSource();
         this._addRubberBand();
@@ -521,8 +521,7 @@ class IconView extends Gtk.Fixed {
 
             let slot;
             do {
-                const index = start.column * rows + start.row + offset;
-                slot = {column: Math.floor(index / rows), row: index % rows};
+                slot = slotForIndex(start.column * rows + start.row + offset, rows);
                 offset++;
             } while (occupied.has(slotKey(slot)));
 
@@ -613,249 +612,12 @@ class IconView extends Gtk.Fixed {
             this._selectOnly(null);
 
         if (icon)
-            this._popupItemMenu(x, y);
+            this._menus.popupItemMenu(x, y);
         else
-            this._popupBackgroundMenu(x, y);
+            this._menus.popupBackgroundMenu(x, y);
     }
 
-    _onKeyPressed(keyval, state) {
-        const control = (state & Gdk.ModifierType.CONTROL_MASK) !== 0;
-
-        switch (keyval) {
-        case Gdk.KEY_a:
-            if (!control)
-                return Gdk.EVENT_PROPAGATE;
-            this._selectAll();
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_x:
-            if (!control)
-                return Gdk.EVENT_PROPAGATE;
-            this._toClipboard('cut');
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_c:
-            if (!control)
-                return Gdk.EVENT_PROPAGATE;
-            this._toClipboard('copy');
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_v:
-            if (!control)
-                return Gdk.EVENT_PROPAGATE;
-            this._paste();
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_z:
-            if (!control)
-                return Gdk.EVENT_PROPAGATE;
-            this._operations.undo();
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_Return:
-        case Gdk.KEY_KP_Enter:
-            this._onOpen(this.selectedItems);
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_Delete:
-        case Gdk.KEY_KP_Delete:
-            this._trashSelection();
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_F2:
-            this._renameSelection();
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_Escape:
-            this._selectOnly(null);
-            return Gdk.EVENT_STOP;
-        case Gdk.KEY_Left:
-        case Gdk.KEY_Right:
-        case Gdk.KEY_Up:
-        case Gdk.KEY_Down:
-            this._moveSelection(keyval);
-            return Gdk.EVENT_STOP;
-        default:
-            return control ? Gdk.EVENT_PROPAGATE : this._typeAheadKey(keyval);
-        }
-    }
-
-    /**
-     * Jump to the first item whose name starts with what has been typed, the
-     * way every file list does. Keystrokes accumulate until a pause.
-     *
-     * @param {number} keyval - the key pressed
-     * @returns {boolean} whether the key was consumed
-     */
-    _typeAheadKey(keyval) {
-        const unichar = Gdk.keyval_to_unicode(keyval);
-        if (unichar === 0)
-            return Gdk.EVENT_PROPAGATE;
-
-        const character = String.fromCharCode(unichar);
-        if (character.trim() === '' && character !== ' ')
-            return Gdk.EVENT_PROPAGATE;
-
-        this._typeAhead += character;
-        this._restartTypeAheadTimer();
-
-        const prefix = this._typeAhead.toLowerCase();
-        const match = this._icons.find(icon =>
-            icon.item.displayName.toLowerCase().startsWith(prefix));
-        if (match)
-            this._selectOnly(match.item);
-
-        return Gdk.EVENT_STOP;
-    }
-
-    _restartTypeAheadTimer() {
-        if (this._typeAheadId)
-            GLib.Source.remove(this._typeAheadId);
-
-        this._typeAheadId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
-            TYPE_AHEAD_MILLISECONDS, () => {
-                this._typeAheadId = 0;
-                this._typeAhead = '';
-            });
-    }
-
-    _moveSelection(keyval) {
-        if (this._icons.length === 0)
-            return;
-
-        const rows = Math.max(1, Math.floor(
-            (this._workArea.height - EDGE_MARGIN * 2) / this._cellHeight()));
-        const current = this._icons.findIndex(icon => this._selection.has(icon.item.uri));
-        const step = {
-            [Gdk.KEY_Up]: -1,
-            [Gdk.KEY_Down]: 1,
-            [Gdk.KEY_Left]: -rows,
-            [Gdk.KEY_Right]: rows,
-        }[keyval];
-
-        const next = Math.min(this._icons.length - 1,
-            Math.max(0, (current < 0 ? 0 : current + step)));
-        this._selectOnly(this._icons[next].item);
-    }
-
-    // --- menus ---
-
-    _buildMenus() {
-        this._actions = new Gio.SimpleActionGroup();
-        for (const [name, activate] of Object.entries(this._actionHandlers())) {
-            const action = new Gio.SimpleAction({name});
-            action.connect('activate', activate);
-            this._actions.add_action(action);
-        }
-        this.insert_action_group('desktop', this._actions);
-
-        // The background menu is the same whatever is under the pointer, so it
-        // is built once. The item menu is built per click; see _popupItemMenu.
-        const background = new Gio.Menu();
-
-        const create = new Gio.Menu();
-        create.append(_('New Folder'), 'desktop.new-folder');
-        background.append_section(null, create);
-
-        // Five entries, and each one is the only way to reach what it does.
-        // Dropped: Select All and Undo (Ctrl+A, Ctrl+Z), Open Desktop in Files
-        // (the desktop already is that folder), and Display Settings (nothing
-        // to do with the desktop).
-        const edit = new Gio.Menu();
-        edit.append(_('Paste'), 'desktop.paste');
-        background.append_section(null, edit);
-
-        const open = new Gio.Menu();
-        open.append(_('Open in Terminal'), 'desktop.open-terminal-here');
-        open.append(_('Tidy Up Icons'), 'desktop.tidy-up');
-        background.append_section(null, open);
-
-        const settings = new Gio.Menu();
-        settings.append(_('Change Background…'), 'desktop.change-background');
-        background.append_section(null, settings);
-
-        this._menu = new Gtk.PopoverMenu({has_arrow: false, halign: Gtk.Align.START});
-        this._menu.set_parent(this);
-        this._backgroundModel = background;
-    }
-
-    _popupItemMenu(x, y) {
-        const items = this.selectedItems;
-        const available = actionAvailability(items);
-        for (const [name, enabled] of Object.entries(available))
-            this._actions.lookup_action(name)?.set_enabled(enabled);
-
-        this._popup(buildItemMenu(items), x, y);
-    }
-
-    _popupBackgroundMenu(x, y) {
-        this._popup(this._backgroundModel, x, y);
-    }
-
-    _popup(model, x, y) {
-        this._menu.set_menu_model(model);
-        this._menu.set_pointing_to(new Gdk.Rectangle({x, y, width: 1, height: 1}));
-        this._menu.popup();
-    }
-
-    _actionHandlers() {
-        return {
-            'open': () => this._onOpen(this.selectedItems),
-            'open-with': () => this._openWith(),
-            'open-terminal': () => this._openTerminalInSelection(),
-            'rename': () => this._renameSelection(),
-            'empty-trash': () => this._operations.emptyTrash(),
-            'run': () => this._runSelection(),
-            'eject': () => this._ejectSelection(),
-            'cut': () => this._toClipboard('cut'),
-            'copy': () => this._toClipboard('copy'),
-            'paste': () => this._paste(),
-            'undo': () => this._operations.undo(),
-            'tidy-up': () => this._tidyUp(),
-            'set-background': () => this._setBackground(),
-            'allow-launching': () => this._allowLaunching(),
-            'properties': () => this._operations.showProperties(this._selectedUris()),
-            'trash': () => this._trashSelection(),
-            'select-all': () => this._selectAll(),
-            'new-folder': () => this._newFolder(),
-            'open-terminal-here': () => openTerminal(this._directory),
-            'change-background': () => launchSettings('background'),
-        };
-    }
-
-    _runSelection() {
-        const [item] = this.selectedItems;
-        if (item)
-            runInTerminal(item.file);
-    }
-
-    _ejectSelection() {
-        const [item] = this.selectedItems;
-        const {mount} = item ?? {};
-        if (!mount)
-            return;
-
-        // Eject is for removable media; unmount is the rest. Asking for the
-        // wrong one fails, so pick by what the mount says it can do.
-        const operation = new Gtk.MountOperation({parent: this.get_root()});
-        if (mount.can_eject()) {
-            mount.eject_with_operation(Gio.MountUnmountFlags.NONE, operation, null,
-                (source, result) => reportUnmount(source, () => source.eject_with_operation_finish(result)));
-        } else {
-            mount.unmount_with_operation(Gio.MountUnmountFlags.NONE, operation, null,
-                (source, result) => reportUnmount(source, () => source.unmount_with_operation_finish(result)));
-        }
-    }
-
-    _renameSelection() {
-        const [item] = this.selectedItems;
-        if (!item)
-            return;
-
-        const icon = this._icons.find(candidate => candidate.item.uri === item.uri);
-        const bounds = icon?.compute_bounds(this)[1];
-        if (!bounds)
-            return;
-
-        this._rename.open(item, new Gdk.Rectangle({
-            x: bounds.get_x(),
-            y: bounds.get_y(),
-            width: bounds.get_width(),
-            height: bounds.get_height(),
-        }));
-    }
+    // --- clipboard ---
 
     _toClipboard(intent) {
         const items = this.selectedItems;
@@ -887,40 +649,6 @@ class IconView extends Gtk.Fixed {
         }
 
         this._layout();
-    }
-
-    _openTerminalInSelection() {
-        const [item] = this.selectedItems;
-        if (item?.isDirectory)
-            openTerminal(item.file);
-    }
-
-    _setBackground() {
-        const [item] = this.selectedItems;
-        if (!item)
-            return;
-
-        // Both keys, or the wallpaper only changes in one of light and dark.
-        const settings = new Gio.Settings({schema_id: 'org.gnome.desktop.background'});
-        settings.set_string('picture-uri', item.uri);
-        settings.set_string('picture-uri-dark', item.uri);
-    }
-
-    _allowLaunching() {
-        const [item] = this.selectedItems;
-        if (!item)
-            return;
-
-        // Files marks a launcher trusted by making it executable and stamping
-        // metadata::trusted; do both, so Files agrees with us afterwards.
-        try {
-            const info = new Gio.FileInfo();
-            info.set_attribute_uint32('unix::mode', 0o755);
-            info.set_attribute_string('metadata::trusted', 'true');
-            item.file.set_attributes_from_info(info, Gio.FileQueryInfoFlags.NONE, null);
-        } catch (error) {
-            printerr(`iconView: cannot trust ${item.name}: ${error.message}`);
-        }
     }
 
     _selectedUris() {
@@ -985,62 +713,7 @@ class IconView extends Gtk.Fixed {
 
         return Gtk.IconTheme.get_for_display(display).has_gicon(icon);
     }
-
-    _openWith() {
-        const [item] = this.selectedItems;
-        if (!item)
-            return;
-
-        const dialog = new OpenWithDialog({
-            item,
-            application: this.get_root()?.application ?? null,
-            onChoose: (application, alwaysUse) =>
-                this._launchWith(item, application, alwaysUse),
-        });
-        dialog.present();
-    }
-
-    /**
-     * @param {object} item - what to open
-     * @param {Gio.AppInfo} application - what to open it with
-     * @param {boolean} alwaysUse - whether to make it the default for the type
-     */
-    _launchWith(item, application, alwaysUse) {
-        const type = item.isDirectory ? 'inode/directory' : item.contentType;
-
-        if (alwaysUse) {
-            try {
-                application.set_as_default_for_type(type);
-                // Nothing about the file changed, so no monitor will fire and
-                // nothing will redraw. Repaint the badges by hand.
-                this._refreshApplicationIcons();
-            } catch (error) {
-                printerr(`iconView: cannot make ${application.get_id()} the default: ${error.message}`);
-            }
-        }
-
-        const context = this.get_display().get_app_launch_context();
-        context.set_timestamp(Gdk.CURRENT_TIME);
-        try {
-            application.launch_uris([item.uri], context);
-        } catch (error) {
-            printerr(`iconView: cannot open with ${application.get_id()}: ${error.message}`);
-        }
-    }
 });
-
-/**
- * @param {Gio.Mount} mount - the mount being released
- * @param {Function} finish - the matching finish call
- */
-function reportUnmount(mount, finish) {
-    try {
-        finish();
-    } catch (error) {
-        if (!error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.FAILED_HANDLED))
-            printerr(`iconView: cannot eject ${mount.get_name()}: ${error.message}`);
-    }
-}
 
 /**
  * @param {object} rect - a rectangle in view coordinates
@@ -1078,6 +751,15 @@ function slotKey({column, row}) {
 }
 
 /**
+ * @param {number} index - a linear slot index, counting down each column
+ * @param {number} rows - the slots in one column
+ * @returns {object} the slot at that index
+ */
+function slotForIndex(index, rows) {
+    return {column: Math.floor(index / rows), row: index % rows};
+}
+
+/**
  * @param {Gio.File} directory - where the new item goes
  * @param {string} base - the preferred name
  * @returns {string} a name that is not taken yet
@@ -1091,28 +773,4 @@ function uniqueName(directory, base) {
         if (!directory.get_child(candidate).query_exists(null))
             return candidate;
     }
-}
-
-/**
- * @param {string} panel - a gnome-control-center panel name
- */
-function launchSettings(panel) {
-    try {
-        GLib.spawn_async(null, ['gnome-control-center', panel], null,
-            GLib.SpawnFlags.SEARCH_PATH, null);
-    } catch (error) {
-        printerr(`iconView: cannot open settings: ${error.message}`);
-    }
-}
-
-/**
- * Whether opening this item means launching it rather than handing it to a
- * viewer. Mirrors the check Files makes: a desktop entry is only launched when
- * the user has marked it executable, otherwise it is just a text file.
- *
- * @param {object} item - a FileModel item
- * @returns {boolean} true when the item is a launcher we may run
- */
-export function isTrustedLauncher(item) {
-    return item.contentType === 'application/x-desktop' && item.isExecutable;
 }

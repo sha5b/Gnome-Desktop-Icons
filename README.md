@@ -67,10 +67,11 @@ Two processes:
 ```
 gnome-shell process          desktop-helper (GTK4, GJS)
   extension.js                 one transparent window per monitor
-  helperProcess.js  <-------->  iconView.js     grid, selection, menus
-  monitorTracker.js   socket    fileModel.js    Gio enumerate + monitor
-  windowLayering.js             thumbnails.js   shared thumbnail cache
-  shellCompat.js                nautilusOps.js  --D-Bus--> Nautilus
+  helperProcess.js  <-------->  iconView.js     grid, selection
+  monitorTracker.js   socket    menus.js        the menus, keyboard.js the keys
+  windowLayering.js             fileModel.js    Gio enumerate + monitor
+  shellCompat.js                thumbnails.js   shared thumbnail cache
+                                nautilusOps.js  --D-Bus--> Nautilus
 ```
 
 The split is not optional. Extension review forbids GTK in the shell process,
@@ -147,8 +148,8 @@ running scripts, and preferences.
 German translation included. `make pot` refreshes the template, and a new
 language needs one `locale/xx.po` file.
 
-Not verified yet: rubber-band and drag-out with a real mouse. `PLAN.md` covers
-the rest of the work. `SUBMISSION.md` holds the extensions.gnome.org checklist.
+Not verified yet: rubber-band and drag-out with a real mouse. `SUBMISSION.md`
+holds the extensions.gnome.org checklist.
 
 ## Author
 

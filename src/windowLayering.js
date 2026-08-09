@@ -19,8 +19,7 @@ import Meta from 'gi://Meta';
 
 import {debug} from './debug.js';
 import * as Compat from './shellCompat.js';
-
-const TITLE_PREFIX = 'gnome-desktop-icons:';
+import {TITLE_PREFIX} from '../helper/core/protocol.js';
 
 export class WindowLayering {
     constructor() {

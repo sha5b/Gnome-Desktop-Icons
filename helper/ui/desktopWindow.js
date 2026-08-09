@@ -12,11 +12,10 @@
 // rather than the work area, and still delivers pointer and keyboard events.
 
 import GObject from 'gi://GObject';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 
 import {IconView} from './iconView.js';
-
-const TITLE_PREFIX = 'gnome-desktop-icons:';
+import {TITLE_PREFIX} from '../core/protocol.js';
 
 export const DesktopWindow = GObject.registerClass(
 class DesktopWindow extends Gtk.ApplicationWindow {
@@ -30,24 +29,16 @@ class DesktopWindow extends Gtk.ApplicationWindow {
             ...windowParams,
         });
 
-        this._monitorIndex = monitorIndex;
-        this._monitor = null;
         this.add_css_class('desktop-window');
 
         this._view = new IconView({iconSize, iconSource, thumbnails, operations, onOpen});
         this.set_child(this._view);
     }
 
-    /** @returns {number} the monitor this window belongs to */
-    get monitorIndex() {
-        return this._monitorIndex;
-    }
-
     /**
      * @param {object} monitor - one entry from the extension's monitor snapshot
      */
     setGeometry(monitor) {
-        this._monitor = monitor;
         // Only a hint. The extension resizes the window server-side once it is
         // mapped, because a Wayland client cannot size itself to a monitor.
         this.set_default_size(monitor.width, monitor.height);
@@ -69,13 +60,11 @@ class DesktopWindow extends Gtk.ApplicationWindow {
         this._view.setItems(directory, items);
     }
 
-    /**
-     * @param {object} state - shell state from the extension
-     * @param {boolean} state.overview - whether the overview is open
-     */
-    setShellState(state) {
-        // Nothing to do yet. The desktop is behind the overview rather than
-        // hidden by it, and Mutter keeps it out of the window previews.
-        this._overview = state.overview;
+    destroy() {
+        // The view owns things a destroyed widget does not release — a
+        // GSettings listener, a pending timeout, parented popovers — so it is
+        // torn down first, while its window still exists.
+        this._view.destroy();
+        super.destroy();
     }
 });

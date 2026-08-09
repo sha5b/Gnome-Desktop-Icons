@@ -11,11 +11,11 @@
 // Failures are recorded as failed thumbnails, exactly as the spec requires, so
 // a file that cannot be thumbnailed is not retried on every redraw.
 
-import Gdk from 'gi://Gdk';
+import Gdk from 'gi://Gdk?version=4.0';
 import Gio from 'gi://Gio';
 import GnomeDesktop from 'gi://GnomeDesktop?version=4.0';
 
-import './promisify.js';
+import '../core/promisify.js';
 
 // One generation at a time. A desktop full of videos would otherwise fork a
 // thumbnailer per file at once and make the whole session stutter.
@@ -81,7 +81,8 @@ export class ThumbnailLoader {
 
             // Remember the failure so the next redraw does not try again.
             await this._factory.create_failed_thumbnail_async(
-                item.uri, item.modified, this._cancellable).catch(() => {});
+                item.uri, item.modified, this._cancellable)
+                .catch(error => printerr(`thumbnails: cannot record a failed thumbnail for ${item.uri}: ${error.message}`));
             return;
         }
 
@@ -90,7 +91,8 @@ export class ThumbnailLoader {
         onReady(Gdk.Texture.new_for_pixbuf(pixbuf));
 
         await this._factory.save_thumbnail_async(
-            pixbuf, item.uri, item.modified, this._cancellable).catch(() => {});
+            pixbuf, item.uri, item.modified, this._cancellable)
+            .catch(error => printerr(`thumbnails: cannot save the thumbnail for ${item.uri}: ${error.message}`));
     }
 }
 

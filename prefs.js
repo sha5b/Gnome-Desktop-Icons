@@ -9,22 +9,11 @@
 // comes from Files, the wallpaper and scaling from Settings, the icons from the
 // icon theme. Duplicating those here would only let the two disagree.
 
-import Adw from 'gi://Adw';
+import Adw from 'gi://Adw?version=1';
 import Gio from 'gi://Gio';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 
 import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
-
-const ICON_SOURCES = [
-    {value: 'type', title: _('File Type')},
-    {value: 'application', title: _('Opening Application')},
-];
-
-const ICON_SIZES = [
-    {value: 'small', title: _('Small')},
-    {value: 'standard', title: _('Standard')},
-    {value: 'large', title: _('Large')},
-];
 
 export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
     /**
@@ -32,6 +21,19 @@ export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
      */
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
+
+        // Built here, not at module scope, so the translations are bound when
+        // the window is built rather than when the module is imported.
+        const ICON_SOURCES = [
+            {value: 'type', title: _('File Type')},
+            {value: 'application', title: _('Opening Application')},
+        ];
+
+        const ICON_SIZES = [
+            {value: 'small', title: _('Small')},
+            {value: 'standard', title: _('Standard')},
+            {value: 'large', title: _('Large')},
+        ];
 
         const page = new Adw.PreferencesPage({
             title: _('Desktop'),
@@ -46,7 +48,7 @@ export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
         const iconSize = new Adw.ComboRow({
             title: _('Icon Size'),
             model: Gtk.StringList.new(ICON_SIZES.map(size => size.title)),
-            selected: indexOfValue(settings.get_string('icon-size')),
+            selected: indexOfValue(ICON_SIZES, settings.get_string('icon-size'), 1),
         });
         iconSize.connect('notify::selected', row =>
             settings.set_string('icon-size', ICON_SIZES[row.selected].value));
@@ -58,8 +60,7 @@ export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
                 'changes the icon when you change the default program. A thumbnail ' +
                 'wins over both.'),
             model: Gtk.StringList.new(ICON_SOURCES.map(source => source.title)),
-            selected: Math.max(0, ICON_SOURCES.findIndex(source =>
-                source.value === settings.get_string('icon-source'))),
+            selected: indexOfValue(ICON_SOURCES, settings.get_string('icon-source')),
         });
         iconSource.connect('notify::selected', row =>
             settings.set_string('icon-source', ICON_SOURCES[row.selected].value));
@@ -96,10 +97,12 @@ export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
 }
 
 /**
- * @param {string} value - a stored icon-size nick
- * @returns {number} its position in the combo, defaulting to Standard
+ * @param {object[]} list - the combo's entries
+ * @param {string} value - a stored nick
+ * @param {number} fallback - index to use when the nick is unknown
+ * @returns {number} the value's position in the combo
  */
-function indexOfValue(value) {
-    const index = ICON_SIZES.findIndex(size => size.value === value);
-    return index < 0 ? 1 : index;
+function indexOfValue(list, value, fallback = 0) {
+    const index = list.findIndex(entry => entry.value === value);
+    return index < 0 ? fallback : index;
 }

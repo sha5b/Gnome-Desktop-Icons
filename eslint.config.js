@@ -97,10 +97,4 @@ export default [
             }],
         },
     },
-    {
-        files: ['helper/**/*.js'],
-        languageOptions: {
-            globals: gjsGlobals,
-        },
-    },
 ];
