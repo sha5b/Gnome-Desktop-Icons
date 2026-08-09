@@ -82,3 +82,40 @@ export function connectWindowCreated(callback) {
     const id = global.display.connect('window-created', callback);
     return () => global.display.disconnect(id);
 }
+
+/** @returns {number} how many workspaces exist */
+export function workspaceCount() {
+    return global.workspace_manager.get_n_workspaces();
+}
+
+/** @returns {number} the index of the active workspace */
+export function activeWorkspaceIndex() {
+    return global.workspace_manager.get_active_workspace_index();
+}
+
+/**
+ * @param {Function} callback - called when the active workspace or the
+ *   workspace count changes
+ * @returns {Function} disconnect thunk
+ */
+export function connectWorkspacesChanged(callback) {
+    const manager = global.workspace_manager;
+    const ids = [
+        manager.connect('workspace-switched', callback),
+        manager.connect('workspace-added', callback),
+        manager.connect('workspace-removed', callback),
+    ];
+    return () => ids.forEach(id => manager.disconnect(id));
+}
+
+/**
+ * Switch to the workspace next to the active one. Past either end this is a
+ * no-op: get_workspace_by_index() returns null out of range.
+ *
+ * @param {number} delta - -1 for the previous workspace, +1 for the next
+ */
+export function activateAdjacentWorkspace(delta) {
+    const manager = global.workspace_manager;
+    const target = manager.get_workspace_by_index(manager.get_active_workspace_index() + delta);
+    target?.activate(global.get_current_time());
+}

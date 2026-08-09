@@ -13,6 +13,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import '../core/promisify.js';
+import {POSITION_ATTRIBUTE} from '../core/protocol.js';
 import {readPosition} from './iconPositions.js';
 
 const ATTRIBUTES = [
@@ -29,6 +30,7 @@ const ATTRIBUTES = [
     'access::can-execute',
     'access::can-write',
     'time::modified',
+    POSITION_ATTRIBUTE,
     'metadata::nautilus-icon-position',
 ].join(',');
 

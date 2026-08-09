@@ -46,6 +46,10 @@ class DesktopHelper {
         this._ipc = null;
         this._iconSize = DEFAULT_ICON_SIZE;
         this._iconSource = 'type';
+        // Standalone there is only one workspace and it never changes; the
+        // extension overwrites both as soon as it connects.
+        this._activeWorkspace = 0;
+        this._workspaceCount = 1;
 
         this._directory = Gio.File.new_for_path(
             GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP) ??
@@ -153,6 +157,9 @@ class DesktopHelper {
         case 'settings':
             this._setSettings(message);
             break;
+        case 'workspaces':
+            this._setWorkspaces(message.active, message.count);
+            break;
         default:
             printerr(`main: unknown message "${message.type}"`);
             break;
@@ -176,11 +183,13 @@ class DesktopHelper {
                     thumbnails: this._thumbnails,
                     operations: this._operations,
                     onOpen: items => this._open(items),
+                    onSwitchWorkspace: delta => this._switchWorkspace(delta),
                 });
                 this._windows.set(monitor.index, window);
             }
 
             window.setGeometry(monitor);
+            window.setWorkspaces(this._activeWorkspace, this._workspaceCount);
             window.setItems(this._directory,
                 [...this._special.list(), ...this._model.items]);
             window.present();
@@ -199,6 +208,27 @@ class DesktopHelper {
         const items = [...this._special.list(), ...this._model.items];
         for (const window of this._windows.values())
             window.setItems(this._directory, items);
+    }
+
+    /**
+     * @param {number} active - the workspace now showing
+     * @param {number} count - how many workspaces exist
+     */
+    _setWorkspaces(active, count) {
+        this._activeWorkspace = active;
+        this._workspaceCount = count;
+        for (const window of this._windows.values())
+            window.setWorkspaces(active, count);
+    }
+
+    /**
+     * Ask the extension to flip workspaces; only it can. Standalone there is
+     * nowhere to flip to.
+     *
+     * @param {number} delta - -1 for the previous workspace, +1 for the next
+     */
+    _switchWorkspace(delta) {
+        this._ipc?.send({type: 'switch-workspace', delta});
     }
 
     _setSettings({iconSize, iconSource, showHidden, showHome, showTrash, showVolumes}) {

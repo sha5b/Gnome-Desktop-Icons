@@ -16,6 +16,7 @@
 
 import Gdk from 'gi://Gdk?version=4.0';
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk?version=4.0';
 
@@ -32,10 +33,17 @@ import {pasteFromClipboard, setClipboard} from '../dnd/clipboard.js';
 const CELL_PADDING = 12;
 const EDGE_MARGIN = 16;
 
+// Drag-to-edge workspace flipping: how close to the left or right window edge
+// the pointer must hover mid-drag, and for how long, before the desktop flips
+// to the next workspace over.
+const EDGE_ZONE = 24;
+const EDGE_DWELL_MILLISECONDS = 500;
+
 export const IconView = GObject.registerClass(
 class IconView extends Gtk.Fixed {
     _init(params) {
-        const {iconSize, iconSource, thumbnails, operations, onOpen, ...fixedParams} = params;
+        const {iconSize, iconSource, thumbnails, operations, onOpen,
+            onSwitchWorkspace, ...fixedParams} = params;
 
         super._init(fixedParams);
 
@@ -44,11 +52,22 @@ class IconView extends Gtk.Fixed {
         this._thumbnails = thumbnails;
         this._operations = operations;
         this._onOpen = onOpen;
+        this._onSwitchWorkspace = onSwitchWorkspace ?? null;
 
         this._icons = [];
         this._selection = new Set();
         this._workArea = null;
         this._directory = null;
+
+        // Every icon belongs to exactly one workspace; this view shows one of
+        // them. The extension tells us which, over IPC; standalone there is
+        // only ever workspace 0.
+        this._activeWorkspace = 0;
+        this._workspaceCount = 1;
+
+        this._edgeZone = 0;
+        this._edgeFiredZone = 0;
+        this._edgeTimeoutId = 0;
 
         this._clickPolicy = new ClickPolicy(() => {});
         this._menus = new Menus(this);
@@ -117,12 +136,30 @@ class IconView extends Gtk.Fixed {
     }
 
     /**
+     * @param {number} active - the workspace now showing
+     * @param {number} count - how many workspaces exist
+     */
+    setWorkspaces(active, count) {
+        if (active === this._activeWorkspace && count === this._workspaceCount)
+            return;
+
+        this._activeWorkspace = active;
+        this._workspaceCount = count;
+
+        // A different set of icons owns this workspace: rebuild from the full
+        // item list rather than patching the grid.
+        if (this._allItems)
+            this.setItems(this._directory, this._allItems);
+    }
+
+    /**
      * Tears down what widget destruction will not: the keyboard's pending
-     * type-ahead source, the menus' parented popovers, and the GSettings
-     * listener behind the click policy. Call before the window holding the
-     * view is destroyed, or every rebuild leaks them.
+     * type-ahead source, the menus' parented popovers, the GSettings listener
+     * behind the click policy, and a pending edge-flip timeout. Call before
+     * the window holding the view is destroyed, or every rebuild leaks them.
      */
     destroy() {
+        this._cancelEdgeFlip();
         this._keyboard.destroy();
         this._menus.destroy();
         this._clickPolicy.destroy();
@@ -144,11 +181,22 @@ class IconView extends Gtk.Fixed {
      * by falling inside its work area; anything never dragged lives on the
      * primary monitor.
      *
+     * Before any of that, the workspace decides: an icon is only drawn on the
+     * workspace it belongs to. A position whose workspace no longer exists is
+     * clamped to the last one for display only — the stored value is never
+     * rewritten for this.
+     *
      * @param {object} item - a FileModel item
      * @returns {boolean} whether this view should draw it
      */
     _ownsItem(item) {
         if (!this._monitor)
+            return false;
+
+        const workspace = item.position
+            ? Math.min(item.position.ws, this._workspaceCount - 1)
+            : 0;
+        if (workspace !== this._activeWorkspace)
             return false;
 
         if (!item.position)
@@ -402,6 +450,29 @@ class IconView extends Gtk.Fixed {
 
     // --- drag out ---
 
+    /**
+     * Frame the work area while a drag-out is in flight. The window covers the
+     * whole monitor, but GTK cancels drops outside the work area — the dock
+     * owns that strip — so show where a drop will actually land.
+     */
+    _showDropZone() {
+        if (!this._workArea)
+            return;
+
+        this._dropZone = new Gtk.Box({css_classes: ['drop-zone']});
+        this._dropZone.set_can_target(false);
+        this.put(this._dropZone, this._workArea.x, this._workArea.y);
+        this._dropZone.set_size_request(this._workArea.width, this._workArea.height);
+    }
+
+    _hideDropZone() {
+        if (!this._dropZone)
+            return;
+
+        this.remove(this._dropZone);
+        this._dropZone = null;
+    }
+
     _addDragSource() {
         addDragSource(this, {
             onPrepareAt: (x, y) => {
@@ -416,8 +487,15 @@ class IconView extends Gtk.Fixed {
 
                 return {items: this.selectedItems, widget: icon};
             },
-            onBegin: () => this.add_css_class('dragging'),
-            onEnd: () => this.remove_css_class('dragging'),
+            onBegin: () => {
+                this.add_css_class('dragging');
+                this._showDropZone();
+            },
+            onEnd: () => {
+                this.remove_css_class('dragging');
+                this._hideDropZone();
+                this._resetEdgeFlip();
+            },
         });
     }
 
@@ -434,11 +512,69 @@ class IconView extends Gtk.Fixed {
             target?.add_css_class('drop-target');
             this._dropTargetIcon = target;
         }
+
+        this._trackEdgeFlip(x);
+    }
+
+    /**
+     * Workspace flipping: dwell on the left or right window edge mid-drag to
+     * move to the previous or next workspace. The window covers the whole
+     * monitor, so the view-local x is effectively the screen-local one, and
+     * the sticky window — and the drag — survive the switch.
+     *
+     * Nothing is logged here; this runs on every motion event of every drag.
+     *
+     * @param {number} x - pointer x, view-local
+     */
+    _trackEdgeFlip(x) {
+        let zone = 0;
+        if (x < EDGE_ZONE)
+            zone = -1;
+        else if (x > this.get_width() - EDGE_ZONE)
+            zone = 1;
+
+        if (zone === this._edgeZone)
+            return;
+
+        this._cancelEdgeFlip();
+        this._edgeZone = zone;
+
+        // Leaving the strip is what rearms it: one dwell, one flip. Without
+        // that, holding the pointer on the edge would machine-gun through
+        // every workspace.
+        if (zone === 0) {
+            this._edgeFiredZone = 0;
+            return;
+        }
+
+        if (!this._onSwitchWorkspace || zone === this._edgeFiredZone)
+            return;
+
+        this._edgeTimeoutId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT,
+            EDGE_DWELL_MILLISECONDS, () => {
+                this._edgeTimeoutId = 0;
+                this._edgeFiredZone = this._edgeZone;
+                this._onSwitchWorkspace(this._edgeZone);
+            });
+    }
+
+    _cancelEdgeFlip() {
+        if (this._edgeTimeoutId) {
+            GLib.Source.remove(this._edgeTimeoutId);
+            this._edgeTimeoutId = 0;
+        }
+    }
+
+    _resetEdgeFlip() {
+        this._cancelEdgeFlip();
+        this._edgeZone = 0;
+        this._edgeFiredZone = 0;
     }
 
     _clearDropHighlight() {
         this._dropTargetIcon?.remove_css_class('drop-target');
         this._dropTargetIcon = null;
+        this._resetEdgeFlip();
     }
 
     _onFilesDropped(files, x, y, action) {
@@ -492,7 +628,9 @@ class IconView extends Gtk.Fixed {
 
     /**
      * Lay the dragged icons out from the drop point, keeping their order, and
-     * remember where each landed.
+     * remember where each landed. The workspace the view is showing becomes
+     * the workspace the icons belong to — which is how a drop after an
+     * edge-flip moves an icon to another workspace.
      *
      * @param {Gio.File[]} files - the dropped files
      * @param {number} x - drop point, monitor-local
@@ -515,7 +653,10 @@ class IconView extends Gtk.Fixed {
         let offset = 0;
 
         for (const uri of dropped) {
-            const item = this._icons.find(icon => icon.item.uri === uri)?.item;
+            // Look in the full item list, not the visible icons: after an
+            // edge-flip the dragged icons still belong to the workspace the
+            // drag started on, so they are not drawn here any more.
+            const item = this._allItems.find(candidate => candidate.uri === uri);
             if (!item)
                 continue;
 
@@ -528,6 +669,7 @@ class IconView extends Gtk.Fixed {
             occupied.add(slotKey(slot));
             const origin = this._slotOrigin(slot);
             const position = {
+                ws: this._activeWorkspace,
                 x: this._monitor.x + origin.x,
                 y: this._monitor.y + origin.y,
             };
@@ -538,10 +680,12 @@ class IconView extends Gtk.Fixed {
             // would snap back to where it started.
             item.position = position;
             if (!item.special)
-                writePosition(item.file, position.x, position.y);
+                writePosition(item.file, position.ws, position.x, position.y);
         }
 
-        this._layout();
+        // Rebuild rather than re-layout: icons dropped after an edge-flip
+        // have just joined this workspace and are not in the grid yet.
+        this.setItems(this._directory, this._allItems);
     }
 
     _onTextDropped(text, x, y) {
@@ -573,7 +717,8 @@ class IconView extends Gtk.Fixed {
         }
 
         const origin = this._slotOrigin(this._slotAt(x, y));
-        writePosition(file, this._monitor.x + origin.x, this._monitor.y + origin.y);
+        writePosition(file, this._activeWorkspace,
+            this._monitor.x + origin.x, this._monitor.y + origin.y);
     }
 
     _onPrimaryPressed(gesture, nPress, x, y) {

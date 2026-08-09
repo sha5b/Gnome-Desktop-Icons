@@ -13,6 +13,7 @@ import {debug} from './src/debug.js';
 import {DebugCapture, capturePath} from './src/debugCapture.js';
 import {HelperProcess} from './src/helperProcess.js';
 import {MonitorTracker} from './src/monitorTracker.js';
+import * as Compat from './src/shellCompat.js';
 import {WindowLayering} from './src/windowLayering.js';
 
 export default class DesktopIconsExtension extends Extension {
@@ -23,6 +24,8 @@ export default class DesktopIconsExtension extends Extension {
 
         this._layering = new WindowLayering();
         this._monitors = new MonitorTracker(() => this._publishMonitors());
+        this._workspacesDisconnect = Compat.connectWorkspacesChanged(
+            () => this._publishWorkspaces());
         this._helper = new HelperProcess({
             argv: ['gjs', '-m', GLib.build_filenamev([this.path, 'helper', 'main.js'])],
             onMessage: message => this._onHelperMessage(message),
@@ -44,6 +47,9 @@ export default class DesktopIconsExtension extends Extension {
         this._settings.disconnect(this._settingsId);
         this._settingsId = 0;
         this._settings = null;
+
+        this._workspacesDisconnect();
+        this._workspacesDisconnect = null;
 
         this._helper.stop();
         this._helper = null;
@@ -77,13 +83,25 @@ export default class DesktopIconsExtension extends Extension {
         });
     }
 
+    _publishWorkspaces() {
+        this._helper.send({
+            type: 'workspaces',
+            active: Compat.activeWorkspaceIndex(),
+            count: Compat.workspaceCount(),
+        });
+    }
+
     _onHelperMessage(message) {
         switch (message.type) {
         case 'ready':
             // The helper has just started, or just restarted after a crash, and
             // knows nothing yet. Send it everything.
             this._publishSettings();
+            this._publishWorkspaces();
             this._publishMonitors();
+            break;
+        case 'switch-workspace':
+            Compat.activateAdjacentWorkspace(message.delta);
             break;
         default:
             console.warn(`gnome-desktop-icons: unknown message "${message.type}"`);

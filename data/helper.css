@@ -75,3 +75,14 @@ window.desktop-window,
   border: 1px solid @accent_bg_color;
   border-radius: 2px;
 }
+
+/* Where a drag-out may be dropped. The window covers the whole monitor but
+   drops outside the work area land on the dock and get cancelled, so outline
+   the valid region while the drag is in flight. Fainter than the rubber band:
+   it is a hint, not a selection. */
+.drop-zone {
+  background-color: alpha(@accent_bg_color, 0.08);
+  outline: 2px dashed alpha(@accent_bg_color, 0.6);
+  outline-offset: -2px;
+  border-radius: 12px;
+}

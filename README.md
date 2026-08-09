@@ -143,7 +143,9 @@ sudo sysctl -w fs.inotify.max_user_instances=1024
 These work: the grid, icons, thumbnails, selection with rubber-band and
 type-ahead, the keyboard, context menus, the Nautilus operations, drag-and-drop,
 the clipboard, saved icon positions, Home, the wastebasket, volumes, rename,
-running scripts, and preferences.
+running scripts, and preferences. Icons are per-workspace: hovering a drag at
+the left or right screen edge flips to the next workspace, and the drop puts
+the icon there.
 
 German translation included. `make pot` refreshes the template, and a new
 language needs one `locale/xx.po` file.

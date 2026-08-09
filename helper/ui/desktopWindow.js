@@ -21,7 +21,7 @@ export const DesktopWindow = GObject.registerClass(
 class DesktopWindow extends Gtk.ApplicationWindow {
     _init(params) {
         const {monitorIndex, iconSize, iconSource, thumbnails, operations, onOpen,
-            ...windowParams} = params;
+            onSwitchWorkspace, ...windowParams} = params;
 
         super._init({
             title: `${TITLE_PREFIX}${monitorIndex}`,
@@ -31,7 +31,8 @@ class DesktopWindow extends Gtk.ApplicationWindow {
 
         this.add_css_class('desktop-window');
 
-        this._view = new IconView({iconSize, iconSource, thumbnails, operations, onOpen});
+        this._view = new IconView({iconSize, iconSource, thumbnails, operations,
+            onOpen, onSwitchWorkspace});
         this.set_child(this._view);
     }
 
@@ -43,6 +44,14 @@ class DesktopWindow extends Gtk.ApplicationWindow {
         // mapped, because a Wayland client cannot size itself to a monitor.
         this.set_default_size(monitor.width, monitor.height);
         this._view.setGeometry(monitor);
+    }
+
+    /**
+     * @param {number} active - the workspace now showing
+     * @param {number} count - how many workspaces exist
+     */
+    setWorkspaces(active, count) {
+        this._view.setWorkspaces(active, count);
     }
 
     /**
