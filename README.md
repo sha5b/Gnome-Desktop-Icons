@@ -137,8 +137,12 @@ type-ahead, keyboard, context menus, the Nautilus operations, drag-and-drop,
 clipboard, saved icon positions, Home/wastebasket/volumes, rename, running
 scripts, preferences, and translation plumbing (`make pot`).
 
-Not yet: no translations exist yet — only the catalogue template. See `PLAN.md`
-for the rest.
+Translated into German. `make pot` refreshes the catalogue template; new
+languages are a `locale/xx.po` away.
+
+Not yet: no rubber-band or drag-out verification with a real mouse. See
+`PLAN.md` for the rest, and `SUBMISSION.md` for the extensions.gnome.org
+checklist.
 
 ## Author
 

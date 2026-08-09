@@ -1,235 +1,236 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR Shahab Nedaei
+# German translations for Gnome Desktop package.
+# Copyright (C) 2026 Shahab Nedaei
 # This file is distributed under the same license as the Gnome Desktop Icons package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# Automatically generated, 2026.
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: Gnome Desktop Icons\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-08-09 19:35+0200\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"PO-Revision-Date: 2026-08-09 19:35+0200\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: prefs.js:19
 msgid "Small"
-msgstr ""
+msgstr "Klein"
 
 #: prefs.js:20
 msgid "Standard"
-msgstr ""
+msgstr "Standard"
 
 #: prefs.js:21
 msgid "Large"
-msgstr ""
+msgstr "Groß"
 
 #: prefs.js:32
 msgid "Desktop"
-msgstr ""
+msgstr "Schreibtisch"
 
 #: prefs.js:37
 msgid "Icons"
-msgstr ""
+msgstr "Symbole"
 
 #: prefs.js:38
 msgid ""
 "Click behaviour follows Files, so the desktop and file windows always agree."
 msgstr ""
+"Das Klickverhalten richtet sich nach »Dateien«, damit Schreibtisch und "
+"Dateifenster übereinstimmen."
 
 #: prefs.js:42
 msgid "Icon Size"
-msgstr ""
+msgstr "Symbolgröße"
 
 #: prefs.js:51
 msgid "Show Hidden Files"
-msgstr ""
+msgstr "Verborgene Dateien anzeigen"
 
 #: prefs.js:52
 msgid "Files whose name begins with a dot"
-msgstr ""
+msgstr "Dateien, deren Name mit einem Punkt beginnt"
 
 #: prefs.js:61
 msgid "Show on the Desktop"
-msgstr ""
+msgstr "Auf dem Schreibtisch anzeigen"
 
 #: prefs.js:62
 msgid "Places that are not files in the Desktop folder."
-msgstr ""
+msgstr "Orte, die keine Dateien im Schreibtisch-Ordner sind."
 
 #: prefs.js:66 helper/specialItems.js:81
 msgid "Home"
-msgstr ""
+msgstr "Persönlicher Ordner"
 
 #: prefs.js:66
 msgid "Your home folder"
-msgstr ""
+msgstr "Ihr persönlicher Ordner"
 
 #: prefs.js:67 helper/specialItems.js:91
 msgid "Wastebasket"
-msgstr ""
+msgstr "Papierkorb"
 
 #: prefs.js:67
 msgid "Shows whether it is empty or full"
-msgstr ""
+msgstr "Zeigt an, ob er leer oder voll ist"
 
 #: prefs.js:68
 msgid "Mounted Drives"
-msgstr ""
+msgstr "Eingehängte Laufwerke"
 
 #: prefs.js:68
 msgid "USB sticks, discs and other mounts"
-msgstr ""
+msgstr "USB-Sticks, Datenträger und andere Einhängepunkte"
 
 #: helper/iconView.js:547
 msgid "Dropped Text.txt"
-msgstr ""
+msgstr "Abgelegter Text.txt"
 
 #: helper/iconView.js:552
 msgid "Dropped Image.png"
-msgstr ""
+msgstr "Abgelegtes Bild.png"
 
 #: helper/iconView.js:747
 msgid "New Folder"
-msgstr ""
+msgstr "Neuer Ordner"
 
 #: helper/iconView.js:755
 msgid "Paste"
-msgstr ""
+msgstr "Einfügen"
 
 #: helper/iconView.js:759 helper/itemMenu.js:117 helper/itemMenu.js:122
 msgid "Open in Terminal"
-msgstr ""
+msgstr "Im Terminal öffnen"
 
 #: helper/iconView.js:760
 msgid "Tidy Up Icons"
-msgstr ""
+msgstr "Symbole aufräumen"
 
 #: helper/iconView.js:764
 msgid "Change Background…"
-msgstr ""
+msgstr "Hintergrund ändern …"
 
 #: helper/iconView.js:937
 msgid "Untitled Folder"
-msgstr ""
+msgstr "Unbenannter Ordner"
 
 #: helper/itemMenu.js:59
 msgid "Cut"
-msgstr ""
+msgstr "Ausschneiden"
 
 #: helper/itemMenu.js:60
 msgid "Copy"
-msgstr ""
+msgstr "Kopieren"
 
 #: helper/itemMenu.js:62
 msgid "Rename…"
-msgstr ""
+msgstr "Umbenennen …"
 
 #: helper/itemMenu.js:63
 #, javascript-format
 msgid "Move %d Item to Trash"
 msgid_plural "Move %d Items to Trash"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%d Objekt in den Papierkorb verschieben"
+msgstr[1] "%d Objekte in den Papierkorb verschieben"
 
 #: helper/itemMenu.js:63
 msgid "Move to Trash"
-msgstr ""
+msgstr "In den Papierkorb verschieben"
 
 #: helper/itemMenu.js:69
 msgid "Properties"
-msgstr ""
+msgstr "Eigenschaften"
 
 #: helper/itemMenu.js:87
 #, javascript-format
 msgid "Open with %s"
-msgstr ""
+msgstr "Mit %s öffnen"
 
 #: helper/itemMenu.js:89
 #, javascript-format
 msgid "Open %d Item"
 msgid_plural "Open %d Items"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%d Objekt öffnen"
+msgstr[1] "%d Objekte öffnen"
 
 #: helper/itemMenu.js:91 helper/openWithDialog.js:35
 msgid "Open"
-msgstr ""
+msgstr "Öffnen"
 
 #: helper/itemMenu.js:94
 msgid "Open With…"
-msgstr ""
+msgstr "Öffnen mit …"
 
 #: helper/itemMenu.js:109
 msgid "Empty Wastebasket"
-msgstr ""
+msgstr "Papierkorb leeren"
 
 #: helper/itemMenu.js:116
 msgid "Eject"
-msgstr ""
+msgstr "Auswerfen"
 
 #: helper/itemMenu.js:125
 msgid "Run in Terminal"
-msgstr ""
+msgstr "Im Terminal ausführen"
 
 #: helper/itemMenu.js:126
 msgid "Run as Administrator"
-msgstr ""
+msgstr "Als Administrator ausführen"
 
 #: helper/itemMenu.js:130
 msgid "Set as Background"
-msgstr ""
+msgstr "Als Hintergrund festlegen"
 
 #: helper/itemMenu.js:135
 msgid "Allow Launching"
-msgstr ""
+msgstr "Starten erlauben"
 
 #: helper/openWithDialog.js:25
 msgid "Open With"
-msgstr ""
+msgstr "Öffnen mit"
 
 #: helper/openWithDialog.js:39
 msgid "Cancel"
-msgstr ""
+msgstr "Abbrechen"
 
 #: helper/openWithDialog.js:56
 #, javascript-format
 msgid "Open “%s” with"
-msgstr ""
+msgstr "„%s“ öffnen mit"
 
 #: helper/openWithDialog.js:68
 msgid "Nothing is registered for this file type"
-msgstr ""
+msgstr "Für diesen Dateityp ist nichts eingetragen"
 
 #: helper/openWithDialog.js:69
 msgid "Pick from every installed application below"
-msgstr ""
+msgstr "Wählen Sie unten aus allen installierten Anwendungen"
 
 #: helper/openWithDialog.js:84
 msgid "All Applications"
-msgstr ""
+msgstr "Alle Anwendungen"
 
 #: helper/openWithDialog.js:85
 #, javascript-format
 msgid "%d more installed"
 msgid_plural "%d more installed"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%d weitere installiert"
+msgstr[1] "%d weitere installiert"
 
 #: helper/openWithDialog.js:102
 msgid "Always Use for This File Type"
-msgstr ""
+msgstr "Immer für diesen Dateityp verwenden"
 
 #: helper/openWithDialog.js:103
 msgid "Makes it the default and changes what a double-click does"
-msgstr ""
+msgstr "Legt die Vorgabe fest und ändert, was ein Doppelklick bewirkt"
 
 #: helper/renamePopover.js:46
 msgid "Rename"
-msgstr ""
+msgstr "Umbenennen"

@@ -87,22 +87,33 @@ devkit: install
 	SHELL_DEBUG=all G_MESSAGES_DEBUG=all \
 		dbus-run-session -- gnome-shell --devkit --wayland
 
+## Build the zip for extensions.gnome.org.
+##
+## The package deliberately contains no gschemas.compiled: `gnome-extensions
+## pack` strips it, because whoever installs the extension compiles it — the
+## Shell's downloader does, and `make install` does. Unzipping by hand does not,
+## and an extension whose schema is not compiled throws out of enable() the
+## moment it calls getSettings(). If you test a package by unzipping it, run
+## glib-compile-schemas on its schemas/ directory first.
 pack: schemas
 	gnome-extensions pack --force \
 		--extra-source=src \
 		--extra-source=helper \
 		--extra-source=data \
+		--podir=locale \
 		--schema=schemas/$(SCHEMA_ID).gschema.xml
 
 clean:
 	rm -f schemas/gschemas.compiled $(UUID).shell-extension.zip
 
 ## Extract translatable strings into locale/gnome-desktop-icons.pot.
+## Plain globs, not `git ls-files`: a source file that has not been committed
+## yet is exactly the one whose strings are most likely to be missing.
 pot:
 	xgettext --from-code=UTF-8 --language=JavaScript \
 		--keyword=_ --keyword=ngettext:1,2 \
 		--package-name="Gnome Desktop Icons" \
 		--copyright-holder="Shahab Nedaei" \
 		--output=locale/$(GETTEXT_DOMAIN).pot \
-		$$(git ls-files 'helper/*.js' 'src/*.js' extension.js prefs.js)
+		extension.js prefs.js src/*.js helper/*.js
 	@echo "wrote locale/$(GETTEXT_DOMAIN).pot"

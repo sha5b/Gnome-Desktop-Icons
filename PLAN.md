@@ -156,8 +156,23 @@ Bugs found by running it, each fixed:
 - A metadata write does not fire the directory monitor, so a drop must re-lay
   out the view itself.
 
-**Resume here:** actual translations (only the `.pot` exists), and a real-mouse
-pass over drag-out, rename and Run.
+**Ready to submit.** German translation done and verified end to end from the
+built package: unzip, compile the schema, load in a nested shell with
+`LANGUAGE=de`, and the menus come up as *Neuer Ordner*, *Einfügen*, *Im Terminal
+öffnen*, *Symbole aufräumen*, *Hintergrund ändern …*. See `SUBMISSION.md` for the
+reviewer note and the checklist.
+
+Two things learned packaging it:
+
+- `make pot` used `git ls-files`, so it silently skipped sources that had not
+  been committed yet — which is exactly where new strings live. It uses plain
+  globs now, and the catalogue went from 45 strings to 52.
+- The package deliberately contains no `gschemas.compiled`; `gnome-extensions
+  pack` strips it and the installer compiles it. Testing a package by unzipping
+  it therefore needs `glib-compile-schemas schemas/` first, or `enable()` throws
+  out of `getSettings()` and the extension never loads.
+
+**Resume here:** a real-mouse pass over drag-out, rubber band, rename and Run.
 
 ## 1. Verified environment
 
