@@ -36,6 +36,16 @@ const RESTART_DELAY_MAX_SECONDS = 30;
 // A helper that stayed up this long counts as healthy, so the backoff resets.
 const HEALTHY_UPTIME_SECONDS = 30;
 
+// Failure paths only. Both go through one call site each, so the journal
+// output stays easy to audit for the "no excessive logging" review rule.
+function logWarn(message) {
+    console.warn(`gnome-desktop-icons: ${message}`);
+}
+
+function logError(message) {
+    console.error(`gnome-desktop-icons: ${message}`);
+}
+
 export class HelperProcess {
     /**
      * @param {object} params - configuration
@@ -85,7 +95,7 @@ export class HelperProcess {
                 // never in the protocol.
                 Gio.SubprocessFlags.NONE);
         } catch (error) {
-            console.error(`gnome-desktop-icons: cannot spawn helper: ${error.message}`);
+            logError(`cannot spawn helper: ${error.message}`);
             this._subprocess = null;
             this._scheduleRestart();
             return;
@@ -171,7 +181,7 @@ export class HelperProcess {
                 new Gio.UnixSocketAddress({path: this._socketPath}),
                 Gio.SocketType.STREAM, Gio.SocketProtocol.DEFAULT, null);
         } catch (error) {
-            console.error(`gnome-desktop-icons: cannot listen on ${this._socketPath}: ${error.message}`);
+            logError(`cannot listen on ${this._socketPath}: ${error.message}`);
             this._service = null;
             return false;
         }
@@ -182,7 +192,7 @@ export class HelperProcess {
 
     _onIncoming(connection) {
         if (!this._isOurHelper(connection)) {
-            console.warn('gnome-desktop-icons: refused a connection from another process');
+            logWarn('refused a connection from another process');
             connection.close(null);
             return;
         }
@@ -231,7 +241,7 @@ export class HelperProcess {
             this._output.put_string(line, null);
         } catch (error) {
             // The child died between the last read and this write.
-            console.warn(`gnome-desktop-icons: cannot write to helper: ${error.message}`);
+            logWarn(`cannot write to helper: ${error.message}`);
         }
     }
 
@@ -243,7 +253,7 @@ export class HelperProcess {
                     [line] = stream.read_line_finish_utf8(result);
                 } catch (error) {
                     if (!error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                        console.warn(`gnome-desktop-icons: helper read failed: ${error.message}`);
+                        logWarn(`helper read failed: ${error.message}`);
                     return;
                 }
 
@@ -260,7 +270,7 @@ export class HelperProcess {
         try {
             message = JSON.parse(line);
         } catch {
-            console.warn(`gnome-desktop-icons: helper sent invalid JSON: ${line}`);
+            logWarn(`helper sent invalid JSON: ${line}`);
             return;
         }
 
@@ -284,7 +294,7 @@ export class HelperProcess {
         // Warning, not error: the helper going away is survivable and the
         // restart below fixes it. console.error() surfaces as CRITICAL in the
         // journal and reads like the extension itself is broken.
-        console.warn(`gnome-desktop-icons: helper exited after ${Math.round(uptime)}s`);
+        logWarn(`helper exited after ${Math.round(uptime)}s`);
 
         this._dropConnection();
         this._subprocess = null;
