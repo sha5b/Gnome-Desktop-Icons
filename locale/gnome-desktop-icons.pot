@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Gnome Desktop Icons\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-09 19:35+0200\n"
+"POT-Creation-Date: 2026-08-09 20:04+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,103 +19,121 @@ msgstr ""
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
 #: prefs.js:19
-msgid "Small"
+msgid "File Type"
 msgstr ""
 
 #: prefs.js:20
+msgid "Opening Application"
+msgstr ""
+
+#: prefs.js:24
+msgid "Small"
+msgstr ""
+
+#: prefs.js:25
 msgid "Standard"
 msgstr ""
 
-#: prefs.js:21
+#: prefs.js:26
 msgid "Large"
 msgstr ""
 
-#: prefs.js:32
+#: prefs.js:37
 msgid "Desktop"
 msgstr ""
 
-#: prefs.js:37
+#: prefs.js:42
 msgid "Icons"
 msgstr ""
 
-#: prefs.js:38
+#: prefs.js:43
 msgid ""
 "Click behaviour follows Files, so the desktop and file windows always agree."
 msgstr ""
 
-#: prefs.js:42
+#: prefs.js:47
 msgid "Icon Size"
 msgstr ""
 
-#: prefs.js:51
+#: prefs.js:56
+msgid "Icon Shows"
+msgstr ""
+
+#: prefs.js:57
+msgid ""
+"“File Type” tells a .stl from a .obj. “Opening Application” changes the icon "
+"when you change the default program. A thumbnail wins over both."
+msgstr ""
+
+#: prefs.js:69
 msgid "Show Hidden Files"
 msgstr ""
 
-#: prefs.js:52
+#: prefs.js:70
 msgid "Files whose name begins with a dot"
 msgstr ""
 
-#: prefs.js:61
+#: prefs.js:79
 msgid "Show on the Desktop"
 msgstr ""
 
-#: prefs.js:62
+#: prefs.js:80
 msgid "Places that are not files in the Desktop folder."
 msgstr ""
 
-#: prefs.js:66 helper/specialItems.js:81
+#: prefs.js:84 helper/specialItems.js:81
 msgid "Home"
 msgstr ""
 
-#: prefs.js:66
+#: prefs.js:84
 msgid "Your home folder"
 msgstr ""
 
-#: prefs.js:67 helper/specialItems.js:91
+#: prefs.js:85 helper/specialItems.js:91
 msgid "Wastebasket"
 msgstr ""
 
-#: prefs.js:67
+#: prefs.js:85
 msgid "Shows whether it is empty or full"
 msgstr ""
 
-#: prefs.js:68
+#: prefs.js:86
 msgid "Mounted Drives"
 msgstr ""
 
-#: prefs.js:68
+#: prefs.js:86
 msgid "USB sticks, discs and other mounts"
 msgstr ""
 
-#: helper/iconView.js:547
+#: helper/iconView.js:549
 msgid "Dropped Text.txt"
 msgstr ""
 
-#: helper/iconView.js:552
+#: helper/iconView.js:554
 msgid "Dropped Image.png"
 msgstr ""
 
-#: helper/iconView.js:747
+#: helper/iconView.js:749
 msgid "New Folder"
 msgstr ""
 
-#: helper/iconView.js:755
+#: helper/iconView.js:757
 msgid "Paste"
 msgstr ""
 
-#: helper/iconView.js:759 helper/itemMenu.js:117 helper/itemMenu.js:122
+#: helper/iconView.js:761 helper/itemMenu.js:117 helper/itemMenu.js:122
 msgid "Open in Terminal"
 msgstr ""
 
-#: helper/iconView.js:760
+#: helper/iconView.js:762
 msgid "Tidy Up Icons"
 msgstr ""
 
-#: helper/iconView.js:764
+#: helper/iconView.js:766
 msgid "Change Background…"
 msgstr ""
 
-#: helper/iconView.js:937
+#: helper/iconView.js:939
 msgid "Untitled Folder"
 msgstr ""
 

@@ -15,6 +15,11 @@ import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+const ICON_SOURCES = [
+    {value: 'type', title: _('File Type')},
+    {value: 'application', title: _('Opening Application')},
+];
+
 const ICON_SIZES = [
     {value: 'small', title: _('Small')},
     {value: 'standard', title: _('Standard')},
@@ -46,6 +51,19 @@ export default class GnomeDesktopIconsPreferences extends ExtensionPreferences {
         iconSize.connect('notify::selected', row =>
             settings.set_string('icon-size', ICON_SIZES[row.selected].value));
         group.add(iconSize);
+
+        const iconSource = new Adw.ComboRow({
+            title: _('Icon Shows'),
+            subtitle: _('“File Type” tells a .stl from a .obj. “Opening Application” ' +
+                'changes the icon when you change the default program. A thumbnail ' +
+                'wins over both.'),
+            model: Gtk.StringList.new(ICON_SOURCES.map(source => source.title)),
+            selected: Math.max(0, ICON_SOURCES.findIndex(source =>
+                source.value === settings.get_string('icon-source'))),
+        });
+        iconSource.connect('notify::selected', row =>
+            settings.set_string('icon-source', ICON_SOURCES[row.selected].value));
+        group.add(iconSource);
 
         const showHidden = new Adw.SwitchRow({
             title: _('Show Hidden Files'),

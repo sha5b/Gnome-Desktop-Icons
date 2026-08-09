@@ -8,6 +8,13 @@
 // GTK icon theme — the same lookup Files does, so a .mp4 gets the video icon
 // and a .stl gets the model icon without us keeping a table of our own.
 // A thumbnail replaces it later if one can be made.
+//
+// Where a file has no thumbnail, the *application* that opens it wins over the
+// type icon. GNOME derives a file's icon from its type alone, which means
+// changing the default application changes nothing you can see. Here it does:
+// point a .csv at LibreOffice Calc and it looks like a Calc document, point it
+// at the text editor and it looks like a text document. A real thumbnail always
+// wins — a photograph of the file's contents says more than either.
 
 import GObject from 'gi://GObject';
 import Gtk from 'gi://Gtk';
@@ -18,7 +25,7 @@ const LABEL_LINES = 2;
 export const DesktopIcon = GObject.registerClass(
 class DesktopIcon extends Gtk.Box {
     _init(params) {
-        const {item, iconSize, cellWidth, ...boxParams} = params;
+        const {item, iconSize, cellWidth, appIcon, ...boxParams} = params;
 
         super._init({
             orientation: Gtk.Orientation.VERTICAL,
@@ -36,6 +43,8 @@ class DesktopIcon extends Gtk.Box {
             halign: Gtk.Align.CENTER,
         });
         this._image.add_css_class('desktop-icon-image');
+        this._hasThumbnail = false;
+        this.setApplicationIcon(appIcon ?? null);
 
         this._label = new Gtk.Label({
             label: item.displayName,
@@ -83,8 +92,22 @@ class DesktopIcon extends Gtk.Box {
      * @param {Gdk.Texture} texture - a generated or cached thumbnail
      */
     setThumbnail(texture) {
+        this._hasThumbnail = true;
         this._image.set_from_paintable(texture);
         this._image.add_css_class('has-thumbnail');
+    }
+
+    /**
+     * @param {?Gio.Icon} icon - the default application's icon, or null for none
+     */
+    setApplicationIcon(icon) {
+        this._applicationIcon = icon;
+
+        // A thumbnail outranks both; do not paint over one.
+        if (this._hasThumbnail)
+            return;
+
+        this._image.set_from_gicon(icon ?? this._item.icon);
     }
 
     _applyEmblems() {

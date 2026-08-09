@@ -20,7 +20,7 @@ import Gtk from 'gi://Gtk';
 
 import {_} from './gettext.js';
 import {DesktopIcon} from './desktopIcon.js';
-import {actionAvailability, buildItemMenu} from './itemMenu.js';
+import {actionAvailability, buildItemMenu, defaultHandler} from './itemMenu.js';
 import {addDragSource, addDropTarget} from './dragAndDrop.js';
 import {clearPosition, writePosition} from './iconPositions.js';
 import {ClickPolicy} from './clickPolicy.js';
@@ -37,11 +37,12 @@ const TYPE_AHEAD_MILLISECONDS = 1000;
 export const IconView = GObject.registerClass(
 class IconView extends Gtk.Fixed {
     _init(params) {
-        const {iconSize, thumbnails, operations, onOpen, ...fixedParams} = params;
+        const {iconSize, iconSource, thumbnails, operations, onOpen, ...fixedParams} = params;
 
         super._init(fixedParams);
 
         this._iconSize = iconSize;
+        this._iconSource = iconSource ?? 'type';
         this._thumbnails = thumbnails;
         this._operations = operations;
         this._onOpen = onOpen;
@@ -90,6 +91,7 @@ class IconView extends Gtk.Fixed {
                 item,
                 iconSize: this._iconSize,
                 cellWidth: this._cellWidth(),
+                appIcon: this._iconFor(item),
             });
             icon.setSelected(this._selection.has(item.uri));
             this._icons.push(icon);
@@ -937,6 +939,54 @@ class IconView extends Gtk.Fixed {
             uniqueName(this._directory, _('Untitled Folder')));
     }
 
+    /**
+     * @param {string} source - "type" or "application"
+     */
+    setIconSource(source) {
+        if (source === this._iconSource)
+            return;
+
+        this._iconSource = source;
+        this._refreshApplicationIcons();
+    }
+
+    /** Re-resolve every icon. Nothing on disk changed, so nothing else will. */
+    _refreshApplicationIcons() {
+        for (const icon of this._icons)
+            icon.setApplicationIcon(this._iconFor(icon.item));
+    }
+
+    /**
+     * Which icon overrides the file type's own, if any.
+     *
+     * Under "type" the answer is usually none — the type icon is more use than
+     * the application's, because it tells .stl from .obj where the application
+     * icon would make every 3D model, and every text file, look identical. The
+     * exception is a type the icon theme has nothing for at all: a generic
+     * sheet of paper says less than the logo of the program that opens it.
+     *
+     * @param {object} item - a FileModel item
+     * @returns {?Gio.Icon} an icon to use instead, or null to keep the type's
+     */
+    _iconFor(item) {
+        if (item.special || item.isDirectory)
+            return null;
+
+        const application = defaultHandler(item)?.get_icon() ?? null;
+        if (this._iconSource === 'application')
+            return application;
+
+        return this._themeHasIcon(item.icon) ? null : application;
+    }
+
+    _themeHasIcon(icon) {
+        const display = this.get_display();
+        if (!display || !icon)
+            return true;
+
+        return Gtk.IconTheme.get_for_display(display).has_gicon(icon);
+    }
+
     _openWith() {
         const [item] = this.selectedItems;
         if (!item)
@@ -962,6 +1012,9 @@ class IconView extends Gtk.Fixed {
         if (alwaysUse) {
             try {
                 application.set_as_default_for_type(type);
+                // Nothing about the file changed, so no monitor will fire and
+                // nothing will redraw. Repaint the badges by hand.
+                this._refreshApplicationIcons();
             } catch (error) {
                 printerr(`iconView: cannot make ${application.get_id()} the default: ${error.message}`);
             }

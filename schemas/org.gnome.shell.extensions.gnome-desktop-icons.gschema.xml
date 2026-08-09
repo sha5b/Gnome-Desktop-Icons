@@ -6,12 +6,27 @@
     <value nick="large" value="2"/>
   </enum>
 
+  <enum id="org.gnome.shell.extensions.gnome-desktop-icons.IconSource">
+    <value nick="type" value="0"/>
+    <value nick="application" value="1"/>
+  </enum>
+
   <schema id="org.gnome.shell.extensions.gnome-desktop-icons"
           path="/org/gnome/shell/extensions/gnome-desktop-icons/">
     <key name="icon-size" enum="org.gnome.shell.extensions.gnome-desktop-icons.IconSize">
       <default>'standard'</default>
       <summary>Icon size</summary>
       <description>Size of the icons drawn on the desktop.</description>
+    </key>
+    <key name="icon-source" enum="org.gnome.shell.extensions.gnome-desktop-icons.IconSource">
+      <default>'type'</default>
+      <summary>What an icon shows</summary>
+      <description>
+        "type" draws the file type's own icon, so a .stl and a .obj look
+        different from each other. "application" draws the icon of the program
+        that opens the file, so changing the default program changes the icon.
+        Either way a thumbnail wins where one exists.
+      </description>
     </key>
     <key name="show-hidden" type="b">
       <default>false</default>

@@ -78,6 +78,7 @@ export default class DesktopIconsExtension extends Extension {
         this._helper.send({
             type: 'settings',
             iconSize: this._settings.get_string('icon-size'),
+            iconSource: this._settings.get_string('icon-source'),
             showHidden: this._settings.get_boolean('show-hidden'),
             showHome: this._settings.get_boolean('show-home'),
             showTrash: this._settings.get_boolean('show-trash'),

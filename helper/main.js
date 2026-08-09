@@ -46,6 +46,7 @@ class DesktopHelper {
         this._ipc = null;
         this._shellState = {overview: false};
         this._iconSize = DEFAULT_ICON_SIZE;
+        this._iconSource = 'type';
 
         this._directory = Gio.File.new_for_path(
             GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP) ??
@@ -175,6 +176,7 @@ class DesktopHelper {
                     application: this._application,
                     monitorIndex: monitor.index,
                     iconSize: this._iconSize,
+                    iconSource: this._iconSource,
                     thumbnails: this._thumbnails,
                     operations: this._operations,
                     onOpen: items => this._open(items),
@@ -204,7 +206,11 @@ class DesktopHelper {
             window.setItems(this._directory, items);
     }
 
-    _setSettings({iconSize, showHidden, showHome, showTrash, showVolumes}) {
+    _setSettings({iconSize, iconSource, showHidden, showHome, showTrash, showVolumes}) {
+        this._iconSource = iconSource;
+        for (const window of this._windows.values())
+            window.setIconSource(iconSource);
+
         this._model.setShowHidden(showHidden);
         this._special.setVisibility({
             home: showHome,

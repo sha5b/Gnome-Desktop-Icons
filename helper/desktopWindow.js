@@ -21,7 +21,8 @@ const TITLE_PREFIX = 'gnome-desktop-icons:';
 export const DesktopWindow = GObject.registerClass(
 class DesktopWindow extends Gtk.ApplicationWindow {
     _init(params) {
-        const {monitorIndex, iconSize, thumbnails, operations, onOpen, ...windowParams} = params;
+        const {monitorIndex, iconSize, iconSource, thumbnails, operations, onOpen,
+            ...windowParams} = params;
 
         super._init({
             title: `${TITLE_PREFIX}${monitorIndex}`,
@@ -33,7 +34,7 @@ class DesktopWindow extends Gtk.ApplicationWindow {
         this._monitor = null;
         this.add_css_class('desktop-window');
 
-        this._view = new IconView({iconSize, thumbnails, operations, onOpen});
+        this._view = new IconView({iconSize, iconSource, thumbnails, operations, onOpen});
         this.set_child(this._view);
     }
 
@@ -51,6 +52,13 @@ class DesktopWindow extends Gtk.ApplicationWindow {
         // mapped, because a Wayland client cannot size itself to a monitor.
         this.set_default_size(monitor.width, monitor.height);
         this._view.setGeometry(monitor);
+    }
+
+    /**
+     * @param {string} source - "type" or "application"
+     */
+    setIconSource(source) {
+        this._view.setIconSource(source);
     }
 
     /**
